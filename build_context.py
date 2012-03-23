@@ -13,6 +13,17 @@ from builder import File
 from log import warn
 from helpers import atoi, relpath
 
+# When the module is imported, change the process title.
+# We do it here because this module is imported by all the scripts.
+try:
+    from setproctitle import setproctitle
+except ImportError:
+    pass
+else:
+    cmdline = sys.argv[:]
+    cmdline[0] = os.path.splitext(os.path.basename(cmdline[0]))[0]
+    setproctitle(" ".join(cmdline))
+
 
 def toplevel(env):
     '''Return True is this is a toplevel call to redo'''
