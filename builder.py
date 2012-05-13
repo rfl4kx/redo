@@ -71,36 +71,12 @@ class BuildJob:
             else:
                 err('no rule to make %r\n' % t)
                 return self._after2(1)
-        unlink(self.tmpname1)
-        unlink(self.tmpname2)
-        ffd = os.open(self.tmpname1, os.O_CREAT|os.O_RDWR|os.O_EXCL, 0666)
-        close_on_exec(ffd, True)
-        self.f = os.fdopen(ffd, 'w+')
-        # this will run in the dofile's directory, so use only basenames here
-        if vars_.OLD_ARGS:
-            arg1 = basename  # target name (no extension)
-            arg2 = ext       # extension (if any), including leading dot
-        else:
-            arg1 = basename + ext  # target name (including extension)
-            arg2 = basename        # target name (without extension)
-        argv = ['sh', '-e',
-                dofile,
-                arg1,
-                arg2,
-                # temp output file name
-                state.relpath(os.path.abspath(self.tmpname2), dodir),
-                ]
-        if vars_.VERBOSE: argv[1] += 'v'
-        if vars_.XTRACE: argv[1] += 'x'
-        if vars_.VERBOSE or vars_.XTRACE: log_('\n')
-        firstline = open(os.path.join(dodir, dofile)).readline().strip()
-        if firstline.startswith('#!/'):
-            argv[0:2] = firstline[2:].split(' ')
+                
+        self.argv = self._setup_argv(dodir, dofile, basename, ext)
         log('%s\n' % _nice(t))
         self.dodir = dodir
         self.basename = basename
         self.ext = ext
-        self.argv = argv
         sf.is_generated = True
         sf.save()
         dof = state.File(name=os.path.join(dodir, dofile))
@@ -132,6 +108,43 @@ class BuildJob:
         def after(t, rv):
             return self._after2(rv)
         jwack.start_job(self.t, run, after)
+
+    def _setup_argv(self, dodir, dofile, basename, ext):
+        unlink(self.tmpname1)
+        unlink(self.tmpname2)
+
+        ffd = os.open(self.tmpname1, os.O_CREAT|os.O_RDWR|os.O_EXCL, 0666)
+        close_on_exec(ffd, True)
+        self.f = os.fdopen(ffd, 'w+')
+
+        # this will run in the dofile's directory, so use only basenames here
+        if vars_.OLD_ARGS:
+            arg1 = basename  # target name (no extension)
+            arg2 = ext       # extension (if any), including leading dot
+        else:
+            arg1 = basename + ext  # target name (including extension)
+            arg2 = basename        # target name (without extension)
+
+        argv = ['sh', '-e',
+                dofile,
+                arg1,
+                arg2,
+                # temp output file name
+                state.relpath(os.path.abspath(self.tmpname2), dodir),
+                ]
+
+        if vars_.VERBOSE:
+            argv[1] += 'v'
+        if vars_.XTRACE:
+            argv[1] += 'x'
+        if vars_.VERBOSE or vars_.XTRACE:
+            log_('\n')
+
+        firstline = open(os.path.join(dodir, dofile)).readline().strip()
+        if firstline.startswith('#!/'):
+            argv[0:2] = firstline[2:].split(' ')
+
+        return argv
 
     def _do_subproc(self):
         # careful: REDO_PWD was the PWD relative to the STARTPATH at the time
