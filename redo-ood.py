@@ -24,6 +24,6 @@ def make_cache():
 
 
 for f in state.files():
-    if f.is_generated and f.read_stamp() != state.STAMP_MISSING:
+    if f.is_generated and f.stamp_not_missing():
         if f.is_dirty(max_changed=vars.RUNID, **make_cache()):
             print f.nicename()

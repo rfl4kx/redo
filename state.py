@@ -188,9 +188,6 @@ class File(object):
             self._init_from_idname(id, name)
             self.t = name or self.name
 
-    def refresh(self):
-        self._init_from_idname(self.id, None)
-
     def save(self):
         cols = join(', ', ['%s=?'%i for i in _file_cols[2:]])
         _write('update Files set '
@@ -204,10 +201,6 @@ class File(object):
     def set_checked(self):
         self.checked_runid = vars_.RUNID
 
-    def set_checked_save(self):
-        self.set_checked()
-        self.save()
-
     def set_changed(self):
         debug2('BUILT: %r (%r)\n' % (self.name, self.stamp))
         self.changed_runid = vars_.RUNID
@@ -216,57 +209,19 @@ class File(object):
 
     def set_failed(self):
         debug2('FAILED: %r\n' % self.name)
-        self.update_stamp()
+        self._update_stamp()
         self.failed_runid = vars_.RUNID
         self.is_generated = True
-        self.zap_deps2()
+        self._zap_deps2()
         self.save()
 
     def set_static(self):
-        self.update_stamp(must_exist=True)
+        self._update_stamp(must_exist=True)
         self.is_override = False
         self.is_generated = False
 
-    def set_override(self):
-        self.update_stamp()
-        self.is_override = True
-
-    def update_stamp(self, must_exist=False):
-        newstamp = self.read_stamp()
-        if must_exist and newstamp == STAMP_MISSING:
-            raise Exception("%r does not exist" % self.name)
-        if newstamp != self.stamp:
-            debug2("STAMP: %s: %r -> %r\n" % (self.name, self.stamp, newstamp))
-            self.stamp = newstamp
-            self.set_changed()
-
-    def is_checked(self):
-        return self.checked_runid and self.checked_runid >= vars_.RUNID
-
-    def is_changed(self):
-        return self.changed_runid and self.changed_runid >= vars_.RUNID
-
     def is_failed(self):
         return self.failed_runid and self.failed_runid >= vars_.RUNID
-
-    def deps(self):
-        q = ('select Deps.mode, Deps.source, %s '
-             '  from Files '
-             '    join Deps on Files.rowid = Deps.source '
-             '  where target=?' % join(', ', _file_cols[1:]))
-        for row in db().execute(q, [self.id]).fetchall():
-            mode = row[0]
-            cols = row[1:]
-            assert mode in ('c', 'm')
-            yield mode,File(cols=cols)
-
-    def zap_deps1(self):
-        debug2('zap-deps1: %r\n' % self.name)
-        _write('update Deps set delete_me=? where target=?', [True, self.id])
-
-    def zap_deps2(self):
-        debug2('zap-deps2: %r\n' % self.name)
-        _write('delete from Deps where target=? and delete_me=1', [self.id])
 
     def add_dep(self, mode, dep):
         src = File(name=dep)
@@ -276,16 +231,8 @@ class File(object):
                "    (target, mode, source, delete_me) values (?,?,?,?)",
                [self.id, mode, src.id, False])
 
-    def read_stamp(self):
-        try:
-            st = os.stat(os.path.join(vars_.BASE, self.name))
-        except OSError:
-            return STAMP_MISSING
-        if stat.S_ISDIR(st.st_mode):
-            return STAMP_DIR
-        else:
-            # a "unique identifier" stamp for a regular file
-            return str((st.st_ctime, st.st_mtime, st.st_size, st.st_ino))
+    def stamp_not_missing(self):
+        return self._read_stamp() != STAMP_MISSING
 
     def nicename(self):
         return relpath(os.path.join(vars_.BASE, self.name), vars_.STARTDIR)
@@ -302,13 +249,13 @@ class File(object):
         return try_stat(self.t)
 
     def check_externally_modified(self):
-        newstamp = self.read_stamp()
+        newstamp = self._read_stamp()
         return (self.is_generated and
                 newstamp != STAMP_MISSING and
                 (self.stamp != newstamp or self.is_override))
 
     def set_externally_modified(self):
-        self.set_override()
+        self._set_override()
         self.set_checked()
         self.save()
 
@@ -322,6 +269,7 @@ class File(object):
         self.save()
 
     def find_do_file(self):
+        self._zap_deps1()
         for dodir, dofile, basedir, basename, ext in possible_do_files(self.name, vars_.BASE):
             dopath = os.path.join(dodir, dofile)
             debug2('%s: %s:%s ?\n' % (self.name, dodir, dofile))
@@ -333,8 +281,8 @@ class File(object):
 
     def is_dirty(self, max_changed, depth='',
                  is_checked=None, set_checked=None):
-        is_checked = is_checked or File.is_checked
-        set_checked = set_checked or File.set_checked_save
+        is_checked = is_checked or File._is_checked
+        set_checked = set_checked or File._set_checked_save
         if vars_.DEBUG >= 1:
             debug('%s?%s\n' % (depth, self.nicename()))
 
@@ -355,7 +303,7 @@ class File(object):
             debug('%s-- DIRTY (no stamp)\n' % depth)
             return DIRTY
 
-        newstamp = self.read_stamp()
+        newstamp = self._read_stamp()
         if self.stamp != newstamp:
             if newstamp == STAMP_MISSING:
                 debug('%s-- DIRTY (missing)\n' % depth)
@@ -367,7 +315,7 @@ class File(object):
                 return DIRTY
 
         must_build = []
-        for mode, f2 in self.deps():
+        for mode, f2 in self._deps():
             assert mode in ('c', 'm')
             dirty = CLEAN
             if mode == 'c':
@@ -419,19 +367,77 @@ class File(object):
         return CLEAN
 
     def fin(self):
-        self.refresh()
+        self._refresh()
         self.is_generated = True
         self.is_override = False
-        if self.is_checked() or self.is_changed():
+        if self._is_checked() or self._is_changed():
             # it got checked during the run; someone ran redo-stamp.
-            # update_stamp would call set_changed(); we don't want that
-            self.stamp = self.read_stamp()
+            # _update_stamp would call set_changed(); we don't want that
+            self.stamp = self._read_stamp()
         else:
             self.csum = None
-            self.update_stamp()
+            self._update_stamp()
             self.set_changed()
-        self.zap_deps2()
+        self._zap_deps2()
         self.save()
+
+# "Private" methods.
+
+    def _refresh(self):
+        self._init_from_idname(self.id, None)
+
+    def _set_checked_save(self):
+        self.set_checked()
+        self.save()
+
+    def _set_override(self):
+        self._update_stamp()
+        self.is_override = True
+
+    def _update_stamp(self, must_exist=False):
+        newstamp = self._read_stamp()
+        if must_exist and newstamp == STAMP_MISSING:
+            raise Exception("%r does not exist" % self.name)
+        if newstamp != self.stamp:
+            debug2("STAMP: %s: %r -> %r\n" % (self.name, self.stamp, newstamp))
+            self.stamp = newstamp
+            self.set_changed()
+
+    def _is_checked(self):
+        return self.checked_runid and self.checked_runid >= vars_.RUNID
+
+    def _is_changed(self):
+        return self.changed_runid and self.changed_runid >= vars_.RUNID
+
+    def _deps(self):
+        q = ('select Deps.mode, Deps.source, %s '
+             '  from Files '
+             '    join Deps on Files.rowid = Deps.source '
+             '  where target=?' % join(', ', _file_cols[1:]))
+        for row in db().execute(q, [self.id]).fetchall():
+            mode = row[0]
+            cols = row[1:]
+            assert mode in ('c', 'm')
+            yield mode,File(cols=cols)
+
+    def _zap_deps1(self):
+        debug2('zap-deps1: %r\n' % self.name)
+        _write('update Deps set delete_me=? where target=?', [True, self.id])
+
+    def _zap_deps2(self):
+        debug2('zap-deps2: %r\n' % self.name)
+        _write('delete from Deps where target=? and delete_me=1', [self.id])
+
+    def _read_stamp(self):
+        try:
+            st = os.stat(os.path.join(vars_.BASE, self.name))
+        except OSError:
+            return STAMP_MISSING
+        if stat.S_ISDIR(st.st_mode):
+            return STAMP_DIR
+        else:
+            # a "unique identifier" stamp for a regular file
+            return str((st.st_ctime, st.st_mtime, st.st_size, st.st_ino))
 
 
 def files():

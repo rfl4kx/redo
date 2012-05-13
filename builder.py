@@ -61,7 +61,6 @@ class BuildJob:
             sf.set_something_else()
             return self._report_results_and_unlock(0)
 
-        sf.zap_deps1()
         (dodir, dofile, basedir, basename, ext) = sf.find_do_file()
         if not dofile:
             if os.path.exists(t):

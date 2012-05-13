@@ -12,5 +12,5 @@ if len(sys.argv[1:]) != 0:
     sys.exit(1)
 
 for f in state.files():
-    if f.is_generated and f.read_stamp() != state.STAMP_MISSING:
+    if f.is_generated and f.stamp_not_missing():
         print f.nicename()
