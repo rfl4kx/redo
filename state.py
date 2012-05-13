@@ -296,6 +296,9 @@ class File(object):
             tmpbase = tmpbase[:ofs] + '__' + tmpbase[ofs + 1:]
         return ('%s.redo1.tmp' % tmpbase), ('%s.redo2.tmp' % tmpbase)
 
+    def try_stat(self):
+        return try_stat(self.t)
+
     def find_do_file(self):
         for dodir, dofile, basedir, basename, ext in possible_do_files(self.name, vars_.BASE):
             dopath = os.path.join(dodir, dofile)

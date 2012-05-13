@@ -22,7 +22,7 @@ class BuildJob:
         self.lock = lock
         self.shouldbuildfunc = shouldbuildfunc
         self.donefunc = donefunc
-        self.before_t = try_stat(self.t)
+        self.before_t = sf.try_stat()
 
     def start(self):
         assert self.lock.owned
