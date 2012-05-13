@@ -4,7 +4,7 @@ import sys, os
 import vars_init
 vars_init.init(sys.argv[1:])
 
-import vars, state, builder, jwack, deps
+import vars, state, builder, jwack
 from helpers import unlink
 from log import debug, debug2, err
 
@@ -13,7 +13,7 @@ def should_build(t):
     if f.is_failed():
         raise builder.ImmediateReturn(32)
     dirty = f.is_dirty(max_changed=vars.RUNID)
-    return dirty==[f] and deps.DIRTY or dirty
+    return dirty==[f] and state.DIRTY or dirty
 
 
 rv = 202

@@ -4,7 +4,7 @@ import sys, os
 import vars_init
 vars_init.init([])
 
-import vars, state, deps
+import vars, state
 from log import err
 
 if len(sys.argv) != 1:
