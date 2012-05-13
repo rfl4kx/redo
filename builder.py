@@ -191,22 +191,7 @@ class BuildJob:
             return rv
 
         assert rv == 0
-        if st2:
-            os.rename(self.tmpname2, t)
-            os.unlink(self.tmpname1)
-        elif st1.st_size > 0:
-            try:
-                os.rename(self.tmpname1, t)
-            except OSError, e:
-                if e.errno == errno.ENOENT:
-                    unlink(t)
-                else:
-                    raise
-            if st2:
-                os.unlink(self.tmpname2)
-        else: # no output generated at all; that's ok
-            unlink(self.tmpname1)
-            unlink(t)
+        self._yeah(st1, st2)
         self.sf.fin()
         f.close()
 
@@ -247,6 +232,25 @@ class BuildJob:
         self.sf.save()
         self.f.close()
         err('%s: exit code %d\n' % (_nice(self.sf.t), rv))
+
+    def _yeah(self, st1, st2):
+        t = self.sf.t
+        if st2:
+            os.rename(self.tmpname2, t)
+            os.unlink(self.tmpname1)
+        elif st1.st_size > 0:
+            try:
+                os.rename(self.tmpname1, t)
+            except OSError, e:
+                if e.errno == errno.ENOENT:
+                    unlink(t)
+                else:
+                    raise
+            if st2:
+                os.unlink(self.tmpname2)
+        else: # no output generated at all; that's ok
+            unlink(self.tmpname1)
+            unlink(t)
 
 
 def main(targets, shouldbuildfunc):
