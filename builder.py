@@ -176,21 +176,20 @@ class BuildJob:
             self._after2(rv)
 
     def _after1(self, t, rv):
+        rv = self._check_direct_modify()
+        if rv:
+            self._nah(rv)
+            return rv
+
         f = self.f
-        before_t = self.before_t
-        after_t = try_stat(t)
         st1 = os.fstat(f.fileno())
         st2 = try_stat(self.tmpname2)
-        if (after_t and 
-            (not before_t or before_t.st_ctime != after_t.st_ctime) and
-            not stat.S_ISDIR(after_t.st_mode)):
-            err('%s modified %s directly!\n' % (self.argv[2], t))
-            err('...you should update $3 (a temp file) or stdout, not $1.\n')
-            rv = 206
-        elif st2 and st1.st_size > 0:
+
+        if st2 and st1.st_size > 0:
             err('%s wrote to stdout *and* created $3.\n' % self.argv[2])
             err('...you should write status messages to stderr, not stdout.\n')
             rv = 207
+
         if rv==0:
             if st2:
                 os.rename(self.tmpname2, t)
@@ -241,6 +240,24 @@ class BuildJob:
             assert self.lock.owned
         finally:
             self.lock.unlock()
+
+    def _check_direct_modify(self):
+        before_t = self.before_t
+        after_t = self.sf.try_stat()
+        if (after_t and
+            (not before_t or before_t.st_ctime != after_t.st_ctime) and
+            not stat.S_ISDIR(after_t.st_mode)):
+            err('%s modified %s directly!\n' % (self.argv[2], self.sf.t))
+            err('...you should update $3 (a temp file) or stdout, not $1.\n')
+            return 206
+        return 0
+
+    def _nah(self, rv):
+        unlink(self.tmpname1)
+        unlink(self.tmpname2)
+        self.sf.set_failed()
+        self.f.close()
+        err('%s: exit code %d\n' % (_nice(self.sf.t), rv))
 
 
 def main(targets, shouldbuildfunc):
