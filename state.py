@@ -399,11 +399,11 @@ class File(object):
                     # unchanged.
                     return [self]
 
-                # our child f2 might be dirty, but it's not sure yet.  It's
-                # given us a list of targets we have to redo in order to
-                # be sure.
-                assert isinstance(dirty, list), repr(dirty)
-                must_build.extend(dirty)
+                elif isinstance(dirty, list):
+                    # our child f2 might be dirty, but it's not sure yet.  It's
+                    # given us a list of targets we have to redo in order to
+                    # be sure.
+                    must_build.extend(dirty)
 
         if must_build:
             # self is *maybe* dirty because at least one of its children is
