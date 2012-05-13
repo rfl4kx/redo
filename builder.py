@@ -185,10 +185,10 @@ class BuildJob:
         st1 = os.fstat(f.fileno())
         st2 = try_stat(self.tmpname2)
 
-        if st2 and st1.st_size > 0:
-            err('%s wrote to stdout *and* created $3.\n' % self.argv[2])
-            err('...you should write status messages to stderr, not stdout.\n')
-            rv = 207
+        rv = self._check_redundant_output(st1, st2)
+        if rv:
+            self._nah(rv)
+            return rv
 
         if rv==0:
             if st2:
@@ -250,6 +250,13 @@ class BuildJob:
             err('%s modified %s directly!\n' % (self.argv[2], self.sf.t))
             err('...you should update $3 (a temp file) or stdout, not $1.\n')
             return 206
+        return 0
+
+    def _check_redundant_output(self, st1, st2):
+        if st2 and st1.st_size > 0:
+            err('%s wrote to stdout *and* created $3.\n' % self.argv[2])
+            err('...you should write status messages to stderr, not stdout.\n')
+            return 207
         return 0
 
     def _nah(self, rv):
