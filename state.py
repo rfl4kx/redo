@@ -299,6 +299,17 @@ class File(object):
     def try_stat(self):
         return try_stat(self.t)
 
+    def check_externally_modified(self):
+        newstamp = self.read_stamp()
+        return (self.is_generated and
+                newstamp != STAMP_MISSING and
+                (self.stamp != newstamp or self.is_override))
+
+    def set_externally_modified(self):
+        self.set_override()
+        self.set_checked()
+        self.save()
+
     def find_do_file(self):
         for dodir, dofile, basedir, basename, ext in possible_do_files(self.name, vars_.BASE):
             dopath = os.path.join(dodir, dofile)
