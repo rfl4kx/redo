@@ -15,8 +15,7 @@ class ImmediateReturn(Exception):
 
 
 class BuildJob:
-    def __init__(self, t, sf, lock, shouldbuildfunc, donefunc):
-        self.t = t  # original target name, not relative to vars_.BASE
+    def __init__(self, sf, lock, shouldbuildfunc, donefunc):
         self.sf = sf
         self.tmpname1, self.tmpname2 = sf.get_tempfilenames()
         self.lock = lock
@@ -27,7 +26,7 @@ class BuildJob:
     def start(self):
         assert self.lock.owned
         try:
-            dirty = self.shouldbuildfunc(self.t)
+            dirty = self.shouldbuildfunc(self.sf.t)
             if not dirty:
                 # target doesn't need to be built; skip the whole task
                 return self._after2(0)
@@ -41,7 +40,7 @@ class BuildJob:
 
     def _start_do(self):
         assert self.lock.owned
-        t = self.t
+        t = self.sf.t
         sf = self.sf
 
         if sf.check_externally_modified():
@@ -97,7 +96,7 @@ class BuildJob:
         # condition; that's why it's called redo-unlocked, because it doesn't
         # grab a lock.
         argv = ['redo-unlocked', self.sf.name] + [d.name for d in dirty]
-        log('(%s)\n' % _nice(self.t))
+        log('(%s)\n' % _nice(self.sf.t))
         state.commit()
         def run():
             os.chdir(vars_.BASE)
@@ -107,7 +106,7 @@ class BuildJob:
             # returns only if there's an exception
         def after(t, rv):
             return self._after2(rv)
-        jwack.start_job(self.t, run, after)
+        jwack.start_job(self.sf.t, run, after)
 
     def _setup_argv(self, dodir, dofile, basename, ext):
         unlink(self.tmpname1)
@@ -201,7 +200,7 @@ class BuildJob:
 
     def _after2(self, rv):
         try:
-            self.donefunc(self.t, rv)
+            self.donefunc(self.sf.t, rv)
             assert self.lock.owned
         finally:
             self.lock.unlock()
@@ -293,7 +292,7 @@ def main(targets, shouldbuildfunc):
                 log('%s (locked...)\n' % _nice(t))
             locked.append((f.id,t))
         else:
-            BuildJob(t, f, lock, shouldbuildfunc, done).start()
+            BuildJob(f, lock, shouldbuildfunc, done).start()
 
     del lock
 
@@ -339,7 +338,7 @@ def main(targets, shouldbuildfunc):
                 retcode[0] = 2
                 lock.unlock()
             else:
-                BuildJob(t, state.File(id=fid), lock,
+                BuildJob(state.File(id=fid), lock,
                          shouldbuildfunc, done).start()
     state.commit()
     return retcode[0]
