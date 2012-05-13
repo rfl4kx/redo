@@ -219,6 +219,8 @@ class File(object):
         self.update_stamp()
         self.failed_runid = vars_.RUNID
         self.is_generated = True
+        self.zap_deps2()
+        self.save()
 
     def set_static(self):
         self.update_stamp(must_exist=True)

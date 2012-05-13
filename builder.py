@@ -229,8 +229,6 @@ class BuildJob:
         unlink(self.tmpname1)
         unlink(self.tmpname2)
         self.sf.set_failed()
-        self.sf.zap_deps2()
-        self.sf.save()
         self.f.close()
         err('%s: exit code %d\n' % (_nice(self.sf.t), rv))
 
