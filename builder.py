@@ -168,6 +168,7 @@ class BuildJob:
         # returns only if there's an exception
 
     def _after(self, t, rv):
+        assert t == self.sf.t
         try:
             state.check_sane()
             rv = self._check_results(t, rv)
