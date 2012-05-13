@@ -207,21 +207,7 @@ class BuildJob:
         else: # no output generated at all; that's ok
             unlink(self.tmpname1)
             unlink(t)
-        sf = self.sf
-        sf.refresh()
-        sf.is_generated = True
-        sf.is_override = False
-        if sf.is_checked() or sf.is_changed():
-            # it got checked during the run; someone ran redo-stamp.
-            # update_stamp would call set_changed(); we don't want that
-            sf.stamp = sf.read_stamp()
-        else:
-            sf.csum = None
-            sf.update_stamp()
-            sf.set_changed()
-
-        sf.zap_deps2()
-        sf.save()
+        self.sf.fin()
         f.close()
 
         if vars_.VERBOSE or vars_.XTRACE or vars_.DEBUG:

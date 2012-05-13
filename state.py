@@ -329,6 +329,21 @@ class File(object):
             self.add_dep('c', dopath)
         return None, None, None, None, None
 
+    def fin(self):
+        self.refresh()
+        self.is_generated = True
+        self.is_override = False
+        if self.is_checked() or self.is_changed():
+            # it got checked during the run; someone ran redo-stamp.
+            # update_stamp would call set_changed(); we don't want that
+            self.stamp = self.read_stamp()
+        else:
+            self.csum = None
+            self.update_stamp()
+            self.set_changed()
+        self.zap_deps2()
+        self.save()
+
 
 def files():
     q = ('select %s from Files order by name' % join(', ', _file_cols))
