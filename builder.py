@@ -91,7 +91,7 @@ class BuildJob:
         # We have to call redo-unlocked to figure it all out.
         #
         # Note: redo-unlocked will handle all the updating of sf, so we
-        # don't have to do it here, nor call _after1.  However, we have to
+        # don't have to do it here, nor call _check_results.  However, we have to
         # hold onto the lock because otherwise we would introduce a race
         # condition; that's why it's called redo-unlocked, because it doesn't
         # grab a lock.
@@ -161,7 +161,8 @@ class BuildJob:
         os.dup2(self.f.fileno(), 1)
         os.close(self.f.fileno())
         close_on_exec(1, False)
-        if vars_.VERBOSE or vars_.XTRACE: log_('* %s\n' % ' '.join(self.argv))
+        if vars_.VERBOSE or vars_.XTRACE:
+            log_('* %s\n' % ' '.join(self.argv))
         os.execvp(self.argv[0], self.argv)
         assert 0
         # returns only if there's an exception
@@ -169,12 +170,12 @@ class BuildJob:
     def _after(self, t, rv):
         try:
             state.check_sane()
-            rv = self._after1(t, rv)
+            rv = self._check_results(t, rv)
             state.commit()
         finally:
             self._report_results_and_unlock(rv)
 
-    def _after1(self, t, rv):
+    def _check_results(self, t, rv):
         rv = self._check_direct_modify()
         if rv:
             self._nah(rv)
