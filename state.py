@@ -288,6 +288,14 @@ class File(object):
     def nicename(self):
         return relpath(os.path.join(vars_.BASE, self.name), vars_.STARTDIR)
 
+    def get_tempfilenames(self):
+        tmpbase = self.t
+        while not os.path.isdir(os.path.dirname(tmpbase) or '.'):
+            ofs = tmpbase.rfind('/')
+            assert ofs >= 0
+            tmpbase = tmpbase[:ofs] + '__' + tmpbase[ofs + 1:]
+        return ('%s.redo1.tmp' % tmpbase), ('%s.redo2.tmp' % tmpbase)
+
 
 def files():
     q = ('select %s from Files order by name' % join(', ', _file_cols))

@@ -30,13 +30,7 @@ class BuildJob:
     def __init__(self, t, sf, lock, shouldbuildfunc, donefunc):
         self.t = t  # original target name, not relative to vars_.BASE
         self.sf = sf
-        tmpbase = t
-        while not os.path.isdir(os.path.dirname(tmpbase) or '.'):
-            ofs = tmpbase.rfind('/')
-            assert ofs >= 0
-            tmpbase = tmpbase[:ofs] + '__' + tmpbase[ofs+1:]
-        self.tmpname1 = '%s.redo1.tmp' % tmpbase
-        self.tmpname2 = '%s.redo2.tmp' % tmpbase
+        self.tmpname1, self.tmpname2 = sf.get_tempfilenames()
         self.lock = lock
         self.shouldbuildfunc = shouldbuildfunc
         self.donefunc = donefunc
