@@ -310,6 +310,15 @@ class File(object):
         self.set_checked()
         self.save()
 
+    def existing_not_generated(self):
+        return (os.path.exists(self.t) and
+                not os.path.isdir(self.t + '/.') and
+                not self.is_generated)
+
+    def set_something_else(self):
+        self.set_static()
+        self.save()
+
     def find_do_file(self):
         for dodir, dofile, basedir, basename, ext in possible_do_files(self.name, vars_.BASE):
             dopath = os.path.join(dodir, dofile)
