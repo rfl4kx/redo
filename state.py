@@ -1,7 +1,7 @@
 import sys, os, errno, glob, stat, fcntl, sqlite3
 import vars as vars_
-from helpers import unlink, close_on_exec, join
-from log import warn, err, debug2, debug3
+from helpers import unlink, close_on_exec, join, try_stat, possible_do_files
+from log import log, warn, err, debug, debug2, debug3
 
 SCHEMA_VER=1
 TIMEOUT=60
@@ -10,6 +10,8 @@ ALWAYS='//ALWAYS'   # an invalid filename that is always marked as dirty
 STAMP_DIR='dir'     # the stamp of a directory; mtime is unhelpful
 STAMP_MISSING='0'   # the stamp of a nonexistent file
 
+CLEAN = 0
+DIRTY = 1
 
 def _connect(dbfile):
     _db = sqlite3.connect(dbfile, timeout=TIMEOUT)
@@ -125,15 +127,13 @@ def relpath(t, base):
     base = os.path.normpath(base)
     tparts = t.split('/')
     bparts = base.split('/')
-    for tp,bp in zip(tparts,bparts):
+    for tp, bp in zip(tparts, bparts):
         if tp != bp:
             break
         tparts.pop(0)
         bparts.pop(0)
-    while bparts:
-        tparts.insert(0, '..')
-        bparts.pop(0)
-    return join('/', tparts)
+    tparts = ['..'] * len(bparts) + tparts
+    return tparts and os.path.join(*tparts) or ''
 
 
 def warn_override(name):
@@ -145,7 +145,7 @@ _file_cols = ['rowid', 'name', 'is_generated', 'is_override',
               'stamp', 'csum']
 class File(object):
     # use this mostly to avoid accidentally assigning to typos
-    __slots__ = ['id'] + _file_cols[1:]
+    __slots__ = ['id', 't'] + _file_cols[1:]
 
     def _init_from_idname(self, id, name):
         q = ('select %s from Files ' % join(', ', _file_cols))
@@ -183,9 +183,10 @@ class File(object):
     
     def __init__(self, id=None, name=None, cols=None):
         if cols:
-            return self._init_from_cols(cols)
+            self._init_from_cols(cols)
         else:
-            return self._init_from_idname(id, name)
+            self._init_from_idname(id, name)
+            self.t = name or self.name
 
     def refresh(self):
         self._init_from_idname(self.id, None)
@@ -307,7 +308,7 @@ class Lock:
         self.lockfile = os.open(os.path.join(vars_.BASE, '.redo/lock.%d' % fid),
                                 os.O_RDWR | os.O_CREAT, 0666)
         close_on_exec(self.lockfile, True)
-        assert _locks.get(fid,0) == 0
+        assert _locks.get(fid, 0) == 0
         _locks[fid] = 1
 
     def __del__(self):
