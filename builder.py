@@ -1,11 +1,11 @@
 import sys, os, errno, stat
-import vars, jwack, state
+import vars as vars_, jwack, state
 from helpers import unlink, close_on_exec, join, try_stat, possible_do_files
 from log import log, log_, debug, debug2, err, warn
 
 
 def _find_do_file(f):
-    for dodir, dofile, basedir, basename, ext in possible_do_files(f.name, vars.BASE):
+    for dodir, dofile, basedir, basename, ext in possible_do_files(f.name, vars_.BASE):
         dopath = os.path.join(dodir, dofile)
         debug2('%s: %s:%s ?\n' % (f.name, dodir, dofile))
         if os.path.exists(dopath):
@@ -17,7 +17,7 @@ def _find_do_file(f):
 
 
 def _nice(t):
-    return state.relpath(t, vars.STARTDIR)
+    return state.relpath(t, vars_.STARTDIR)
 
 
 class ImmediateReturn(Exception):
@@ -28,12 +28,12 @@ class ImmediateReturn(Exception):
 
 class BuildJob:
     def __init__(self, t, sf, lock, shouldbuildfunc, donefunc):
-        self.t = t  # original target name, not relative to vars.BASE
+        self.t = t  # original target name, not relative to vars_.BASE
         self.sf = sf
         tmpbase = t
         while not os.path.isdir(os.path.dirname(tmpbase) or '.'):
             ofs = tmpbase.rfind('/')
-            assert(ofs >= 0)
+            assert ofs >= 0
             tmpbase = tmpbase[:ofs] + '__' + tmpbase[ofs+1:]
         self.tmpname1 = '%s.redo1.tmp' % tmpbase
         self.tmpname2 = '%s.redo2.tmp' % tmpbase
@@ -43,7 +43,7 @@ class BuildJob:
         self.before_t = try_stat(self.t)
 
     def start(self):
-        assert(self.lock.owned)
+        assert self.lock.owned
         try:
             dirty = self.shouldbuildfunc(self.t)
             if not dirty:
@@ -52,13 +52,13 @@ class BuildJob:
         except ImmediateReturn, e:
             return self._after2(e.rv)
 
-        if vars.NO_OOB or dirty == True:
+        if vars_.NO_OOB or dirty == True:
             self._start_do()
         else:
             self._start_unlocked(dirty)
 
     def _start_do(self):
-        assert(self.lock.owned)
+        assert self.lock.owned
         t = self.t
         sf = self.sf
         newstamp = sf.read_stamp()
@@ -100,7 +100,7 @@ class BuildJob:
         close_on_exec(ffd, True)
         self.f = os.fdopen(ffd, 'w+')
         # this will run in the dofile's directory, so use only basenames here
-        if vars.OLD_ARGS:
+        if vars_.OLD_ARGS:
             arg1 = basename  # target name (no extension)
             arg2 = ext       # extension (if any), including leading dot
         else:
@@ -113,9 +113,9 @@ class BuildJob:
                 # temp output file name
                 state.relpath(os.path.abspath(self.tmpname2), dodir),
                 ]
-        if vars.VERBOSE: argv[1] += 'v'
-        if vars.XTRACE: argv[1] += 'x'
-        if vars.VERBOSE or vars.XTRACE: log_('\n')
+        if vars_.VERBOSE: argv[1] += 'v'
+        if vars_.XTRACE: argv[1] += 'x'
+        if vars_.VERBOSE or vars_.XTRACE: log_('\n')
         firstline = open(os.path.join(dodir, dofile)).readline().strip()
         if firstline.startswith('#!/'):
             argv[0:2] = firstline[2:].split(' ')
@@ -147,10 +147,10 @@ class BuildJob:
         log('(%s)\n' % _nice(self.t))
         state.commit()
         def run():
-            os.chdir(vars.BASE)
-            os.environ['REDO_DEPTH'] = vars.DEPTH + '  '
+            os.chdir(vars_.BASE)
+            os.environ['REDO_DEPTH'] = vars_.DEPTH + '  '
             os.execvp(argv[0], argv)
-            assert(0)
+            assert 0
             # returns only if there's an exception
         def after(t, rv):
             return self._after2(rv)
@@ -164,17 +164,17 @@ class BuildJob:
         # now.
         dn = self.dodir
         newp = os.path.realpath(dn)
-        os.environ['REDO_PWD'] = state.relpath(newp, vars.STARTDIR)
+        os.environ['REDO_PWD'] = state.relpath(newp, vars_.STARTDIR)
         os.environ['REDO_TARGET'] = self.basename + self.ext
-        os.environ['REDO_DEPTH'] = vars.DEPTH + '  '
+        os.environ['REDO_DEPTH'] = vars_.DEPTH + '  '
         if dn:
             os.chdir(dn)
         os.dup2(self.f.fileno(), 1)
         os.close(self.f.fileno())
         close_on_exec(1, False)
-        if vars.VERBOSE or vars.XTRACE: log_('* %s\n' % ' '.join(self.argv))
+        if vars_.VERBOSE or vars_.XTRACE: log_('* %s\n' % ' '.join(self.argv))
         os.execvp(self.argv[0], self.argv)
-        assert(0)
+        assert 0
         # returns only if there's an exception
 
     def _after(self, t, rv):
@@ -241,21 +241,21 @@ class BuildJob:
         if rv != 0:
             err('%s: exit code %d\n' % (_nice(t),rv))
         else:
-            if vars.VERBOSE or vars.XTRACE or vars.DEBUG:
+            if vars_.VERBOSE or vars_.XTRACE or vars_.DEBUG:
                 log('%s (done)\n\n' % _nice(t))
         return rv
 
     def _after2(self, rv):
         try:
             self.donefunc(self.t, rv)
-            assert(self.lock.owned)
+            assert self.lock.owned
         finally:
             self.lock.unlock()
 
 
 def main(targets, shouldbuildfunc):
     retcode = [0]  # a list so that it can be reassigned from done()
-    if vars.SHUFFLE:
+    if vars_.SHUFFLE:
         import random
         random.shuffle(targets)
 
@@ -276,7 +276,7 @@ def main(targets, shouldbuildfunc):
         if not jwack.has_token():
             state.commit()
         jwack.get_token(t)
-        if retcode[0] and not vars.KEEP_GOING:
+        if retcode[0] and not vars_.KEEP_GOING:
             break
         if not state.check_sane():
             err('.redo directory disappeared; cannot continue.\n')
@@ -284,12 +284,12 @@ def main(targets, shouldbuildfunc):
             break
         f = state.File(name=t)
         lock = state.Lock(f.id)
-        if vars.UNLOCKED:
+        if vars_.UNLOCKED:
             lock.owned = True
         else:
             lock.trylock()
         if not lock.owned:
-            if vars.DEBUG_LOCKS:
+            if vars_.DEBUG_LOCKS:
                 log('%s (locked...)\n' % _nice(t))
             locked.append((f.id,t))
         else:
@@ -309,7 +309,7 @@ def main(targets, shouldbuildfunc):
         jwack.wait_all()
         # at this point, we don't have any children holding any tokens, so
         # it's okay to block below.
-        if retcode[0] and not vars.KEEP_GOING:
+        if retcode[0] and not vars_.KEEP_GOING:
             break
         if locked:
             if not state.check_sane():
@@ -320,7 +320,7 @@ def main(targets, shouldbuildfunc):
             lock = state.Lock(fid)
             lock.trylock()
             while not lock.owned:
-                if vars.DEBUG_LOCKS:
+                if vars_.DEBUG_LOCKS:
                     warn('%s (WAITING)\n' % _nice(t))
                 # this sequence looks a little silly, but the idea is to
                 # give up our personal token while we wait for the lock to
@@ -331,8 +331,8 @@ def main(targets, shouldbuildfunc):
                 lock.unlock()
                 jwack.get_token(t)
                 lock.trylock()
-            assert(lock.owned)
-            if vars.DEBUG_LOCKS:
+            assert lock.owned
+            if vars_.DEBUG_LOCKS:
                 log('%s (...unlocked!)\n' % _nice(t))
             if state.File(name=t).is_failed():
                 err('%s: failed in another thread\n' % _nice(t))
