@@ -296,6 +296,16 @@ class File(object):
             tmpbase = tmpbase[:ofs] + '__' + tmpbase[ofs + 1:]
         return ('%s.redo1.tmp' % tmpbase), ('%s.redo2.tmp' % tmpbase)
 
+    def find_do_file(self):
+        for dodir, dofile, basedir, basename, ext in possible_do_files(self.name, vars_.BASE):
+            dopath = os.path.join(dodir, dofile)
+            debug2('%s: %s:%s ?\n' % (self.name, dodir, dofile))
+            if os.path.exists(dopath):
+                self.add_dep('m', dopath)
+                return dodir, dofile, basedir, basename, ext
+            self.add_dep('c', dopath)
+        return None, None, None, None, None
+
 
 def files():
     q = ('select %s from Files order by name' % join(', ', _file_cols))

@@ -1,19 +1,7 @@
 import sys, os, errno, stat
 import vars as vars_, jwack, state
-from helpers import unlink, close_on_exec, join, try_stat, possible_do_files
+from helpers import unlink, close_on_exec, join, try_stat
 from log import log, log_, debug, debug2, err, warn
-
-
-def _find_do_file(f):
-    for dodir, dofile, basedir, basename, ext in possible_do_files(f.name, vars_.BASE):
-        dopath = os.path.join(dodir, dofile)
-        debug2('%s: %s:%s ?\n' % (f.name, dodir, dofile))
-        if os.path.exists(dopath):
-            f.add_dep('m', dopath)
-            return dodir,dofile,basedir,basename,ext
-        else:
-            f.add_dep('c', dopath)
-    return None,None,None,None,None
 
 
 def _nice(t):
@@ -79,7 +67,7 @@ class BuildJob:
             sf.save()
             return self._after2(0)
         sf.zap_deps1()
-        (dodir, dofile, basedir, basename, ext) = _find_do_file(sf)
+        (dodir, dofile, basedir, basename, ext) = sf.find_do_file()
         if not dofile:
             if os.path.exists(t):
                 sf.set_static()
