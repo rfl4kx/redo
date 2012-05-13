@@ -190,48 +190,42 @@ class BuildJob:
             self._nah(rv)
             return rv
 
-        if rv==0:
+        assert rv == 0
+        if st2:
+            os.rename(self.tmpname2, t)
+            os.unlink(self.tmpname1)
+        elif st1.st_size > 0:
+            try:
+                os.rename(self.tmpname1, t)
+            except OSError, e:
+                if e.errno == errno.ENOENT:
+                    unlink(t)
+                else:
+                    raise
             if st2:
-                os.rename(self.tmpname2, t)
-                os.unlink(self.tmpname1)
-            elif st1.st_size > 0:
-                try:
-                    os.rename(self.tmpname1, t)
-                except OSError, e:
-                    if e.errno == errno.ENOENT:
-                        unlink(t)
-                    else:
-                        raise
-                if st2:
-                    os.unlink(self.tmpname2)
-            else: # no output generated at all; that's ok
-                unlink(self.tmpname1)
-                unlink(t)
-            sf = self.sf
-            sf.refresh()
-            sf.is_generated = True
-            sf.is_override = False
-            if sf.is_checked() or sf.is_changed():
-                # it got checked during the run; someone ran redo-stamp.
-                # update_stamp would call set_changed(); we don't want that
-                sf.stamp = sf.read_stamp()
-            else:
-                sf.csum = None
-                sf.update_stamp()
-                sf.set_changed()
-        else:
+                os.unlink(self.tmpname2)
+        else: # no output generated at all; that's ok
             unlink(self.tmpname1)
-            unlink(self.tmpname2)
-            sf = self.sf
-            sf.set_failed()
+            unlink(t)
+        sf = self.sf
+        sf.refresh()
+        sf.is_generated = True
+        sf.is_override = False
+        if sf.is_checked() or sf.is_changed():
+            # it got checked during the run; someone ran redo-stamp.
+            # update_stamp would call set_changed(); we don't want that
+            sf.stamp = sf.read_stamp()
+        else:
+            sf.csum = None
+            sf.update_stamp()
+            sf.set_changed()
+
         sf.zap_deps2()
         sf.save()
         f.close()
-        if rv != 0:
-            err('%s: exit code %d\n' % (_nice(t),rv))
-        else:
-            if vars_.VERBOSE or vars_.XTRACE or vars_.DEBUG:
-                log('%s (done)\n\n' % _nice(t))
+
+        if vars_.VERBOSE or vars_.XTRACE or vars_.DEBUG:
+            log('%s (done)\n\n' % _nice(t))
         return rv
 
     def _after2(self, rv):
@@ -263,6 +257,8 @@ class BuildJob:
         unlink(self.tmpname1)
         unlink(self.tmpname2)
         self.sf.set_failed()
+        self.sf.zap_deps2()
+        self.sf.save()
         self.f.close()
         err('%s: exit code %d\n' % (_nice(self.sf.t), rv))
 
