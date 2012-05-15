@@ -198,6 +198,35 @@ class File(object):
                 self.stamp, self.csum,
                 self.id])
 
+    def add_dep(self, mode, dep):
+        src = File(name=dep)
+        debug3('add-dep: "%s" < %s "%s"\n' % (self.name, mode, src.name))
+        assert self.id != src.id
+        _write("insert or replace into Deps "
+               "    (target, mode, source, delete_me) values (?,?,?,?)",
+               [self.id, mode, src.id, False])
+
+    def _deps(self):
+        q = ('select Deps.mode, Deps.source, %s '
+             '  from Files '
+             '    join Deps on Files.rowid = Deps.source '
+             '  where target=?' % join(', ', _file_cols[1:]))
+        for row in db().execute(q, [self.id]).fetchall():
+            mode = row[0]
+            cols = row[1:]
+            assert mode in ('c', 'm')
+            yield mode, File(cols=cols)
+
+    def _zap_deps1(self):
+        debug2('zap-deps1: %r\n' % self.name)
+        _write('update Deps set delete_me=? where target=?', [True, self.id])
+
+    def _zap_deps2(self):
+        debug2('zap-deps2: %r\n' % self.name)
+        _write('delete from Deps where target=? and delete_me=1', [self.id])
+
+# Stuff that doesn't use the db directly
+
     def set_checked(self):
         self.checked_runid = vars_.RUNID
 
@@ -222,14 +251,6 @@ class File(object):
 
     def is_failed(self):
         return self.failed_runid and self.failed_runid >= vars_.RUNID
-
-    def add_dep(self, mode, dep):
-        src = File(name=dep)
-        debug3('add-dep: "%s" < %s "%s"\n' % (self.name, mode, src.name))
-        assert self.id != src.id
-        _write("insert or replace into Deps "
-               "    (target, mode, source, delete_me) values (?,?,?,?)",
-               [self.id, mode, src.id, False])
 
     def stamp_not_missing(self):
         return self._read_stamp() != STAMP_MISSING
@@ -381,8 +402,6 @@ class File(object):
         self._zap_deps2()
         self.save()
 
-# "Private" methods.
-
     def _refresh(self):
         self._init_from_idname(self.id, None)
 
@@ -408,25 +427,6 @@ class File(object):
 
     def _is_changed(self):
         return self.changed_runid and self.changed_runid >= vars_.RUNID
-
-    def _deps(self):
-        q = ('select Deps.mode, Deps.source, %s '
-             '  from Files '
-             '    join Deps on Files.rowid = Deps.source '
-             '  where target=?' % join(', ', _file_cols[1:]))
-        for row in db().execute(q, [self.id]).fetchall():
-            mode = row[0]
-            cols = row[1:]
-            assert mode in ('c', 'm')
-            yield mode,File(cols=cols)
-
-    def _zap_deps1(self):
-        debug2('zap-deps1: %r\n' % self.name)
-        _write('update Deps set delete_me=? where target=?', [True, self.id])
-
-    def _zap_deps2(self):
-        debug2('zap-deps2: %r\n' % self.name)
-        _write('delete from Deps where target=? and delete_me=1', [self.id])
 
     def _read_stamp(self):
         try:

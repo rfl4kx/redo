@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 import sys, os
 
-import vars_init
-vars_init.init([])
+import build_context
+build_context.init(os.environ, sys.argv[0])
 
 import state
 from log import err

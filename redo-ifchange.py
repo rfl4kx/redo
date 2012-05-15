@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 import sys, os
 
-import vars_init
-vars_init.init(sys.argv[1:])
+import build_context
+build_context.init(os.environ, *sys.argv)
 
 import vars, state, builder, jwack
 from helpers import unlink

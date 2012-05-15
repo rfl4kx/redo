@@ -19,6 +19,13 @@ def unlink(f):
             pass  # it doesn't exist, that's what you asked for
 
 
+def unique(N, in_order=False):
+    if in_order:
+        N = list(N)
+        return sorted(set(N), key=N.index)
+    return list(set(N))
+
+
 def close_on_exec(fd, yes):
     fl = fcntl.fcntl(fd, fcntl.F_GETFD)
     fl &= ~fcntl.FD_CLOEXEC

@@ -43,8 +43,8 @@ if opt.debug_pids:
 if opt.old_args:
     os.environ['REDO_OLD_ARGS'] = '1'
 
-import vars_init
-vars_init.init(targets)
+import build_context
+build_context.init(os.environ, sys.argv[0], *targets)
 
 import vars, state, builder, jwack
 from log import warn, err
