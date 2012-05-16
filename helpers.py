@@ -1,5 +1,12 @@
-import os, errno, fcntl
+import sys, os, errno, fcntl
 from atoi import atoi
+
+
+def inside_do_script_guard():
+    if not os.environ.get('REDO'):
+        sys.stderr.write('%s: error: must be run from inside a .do\n'
+                         % sys.argv[0])
+        sys.exit(100)
 
 
 def join(between, l):
