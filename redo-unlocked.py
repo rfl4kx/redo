@@ -26,7 +26,8 @@ me = state.File(name=target)
 # grabbing locks.
 os.environ['REDO_NO_OOB'] = '1'
 if deps:
-    rv = os.spawnvp(os.P_WAIT, 'redo-ifchange', deps)
+    argv = ['redo-ifchange'] + deps
+    rv = os.spawnvp(os.P_WAIT, argv[0], argv)
     if rv:
         sys.exit(rv)
 
@@ -37,4 +38,5 @@ if deps:
 # who initiated the OOB in the first place.)
 #bc.set_unlocked()
 os.environ['REDO_UNLOCKED'] = '1'
-sys.exit(os.spawnvp(os.P_WAIT, 'redo-ifchange', [target]))
+argv = ['redo-ifchange', target]
+sys.exit(os.spawnvp(os.P_WAIT, argv[0], argv))
