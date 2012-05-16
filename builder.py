@@ -4,6 +4,15 @@ from helpers import unlink, close_on_exec, join, try_stat
 from log import log, log_, debug, debug2, err, warn
 
 
+def warn_about_existing_ungenerated(targets):
+    for t in targets:
+        if os.path.exists(t):
+            f = state.File(name=t)
+            if not f.is_generated:
+                warn('%s: exists and not marked as generated; not redoing.\n'
+                     % f.nicename())
+
+
 def _nice(t):
     return state.relpath(t, vars_.STARTDIR)
 
