@@ -2,7 +2,7 @@
 import sys, os
 
 import build_context
-build_context.init(os.environ, *sys.argv)
+bc = build_context.init(os.environ, *sys.argv)
 
 import vars, state, builder, jwack
 from helpers import unlink
@@ -19,9 +19,7 @@ def should_build(t):
 rv = 202
 try:
     if vars.TARGET and not vars.UNLOCKED:
-        me = os.path.join(vars.STARTDIR, 
-                          os.path.join(vars.PWD, vars.TARGET))
-        f = state.File(name=me)
+        f = state.File(name=bc.target_name())
         debug2('TARGET: %r %r %r\n' % (vars.STARTDIR, vars.PWD, vars.TARGET))
     else:
         f = me = None

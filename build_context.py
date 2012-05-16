@@ -71,6 +71,22 @@ def init(env, exename, *targets):
         import state
         state.init()
 
+    return BuildContext(env)
+
+
+class BuildContext(object):
+
+    def __init__(self, env):
+        self.env = env
+
+    def target_name(self):
+        PWD = self.env['REDO_PWD']
+        TARGET = self.env['REDO_TARGET']
+        STARTDIR = self.env['REDO_STARTDIR']
+        return join(STARTDIR, PWD, TARGET)
+
+    def set_unlocked(self):
+        self.env['REDO_UNLOCKED'] = '1'
 
 
 if __name__ == '__main__':

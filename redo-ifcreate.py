@@ -1,13 +1,15 @@
 #!/usr/bin/env python
 import sys, os
+import build_context
+
+bc = build_context.init(os.environ, *sys.argv)
+
 import vars, state
 from log import err
 
 
 try:
-    me = os.path.join(vars.STARTDIR, 
-                      os.path.join(vars.PWD, vars.TARGET))
-    f = state.File(name=me)
+    f = state.File(name=bc.target_name())
     for t in sys.argv[1:]:
         if os.path.exists(t):
             err('redo-ifcreate: error: %r already exists\n' % t)

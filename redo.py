@@ -46,17 +46,11 @@ if opt.old_args:
 import build_context
 build_context.init(os.environ, sys.argv[0], *targets)
 
-import vars, state, builder, jwack
-from log import warn, err
+import builder, jwack
+from log import err
 
 try:
-    for t in targets:
-        if os.path.exists(t):
-            f = state.File(name=t)
-            if not f.is_generated:
-                warn('%s: exists and not marked as generated; not redoing.\n'
-                     % f.nicename())
-    
+    builder.warn_about_existing_ungenerated(targets)
     j = atoi(opt.jobs or 1)
     if j < 1 or j > 1000:
         err('invalid --jobs value: %r\n' % opt.jobs)

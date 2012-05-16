@@ -1,11 +1,7 @@
 import os
-from atoi import atoi
+from helpers import atoi, inside_do_script_guard
 
-if not os.environ.get('REDO'):
-    import sys
-    sys.stderr.write('%s: error: must be run from inside a .do\n'
-                     % sys.argv[0])
-    sys.exit(100)
+inside_do_script_guard()
 
 PWD = os.environ.get('REDO_PWD', '')
 TARGET = os.environ.get('REDO_TARGET', '')
