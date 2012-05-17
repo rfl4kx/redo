@@ -71,15 +71,16 @@ def init(env, exename, *targets):
 
     import state
     state.init()
-    return BuildContext(env, state.File, state.commit)
+    return BuildContext(env, state.File, state.commit, state.files)
 
 
 class BuildContext(object):
 
-    def __init__(self, env, file_class, commit):
+    def __init__(self, env, file_class, commit, files):
         self.env = env
         self.file_class = file_class
         self.commit = commit
+        self.files = files
         # RUNID is initialized in state.init().
         self.RUNID = atoi(self.env.get('REDO_RUNID')) or None
         assert self.RUNID, repr(self.RUNID)

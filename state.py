@@ -273,6 +273,9 @@ class File(object):
     def nicename(self):
         return relpath(os.path.join(vars_.BASE, self.name), vars_.STARTDIR)
 
+    def special(self):
+        return self.name.startswith('//')
+
     def get_tempfilenames(self):
         tmpbase = self.t
         while not os.path.isdir(os.path.dirname(tmpbase) or '.'):

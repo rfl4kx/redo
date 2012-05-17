@@ -2,17 +2,14 @@
 import sys, os
 
 import build_context
-build_context.init(os.environ, sys.argv[0])
+bc = build_context.init(os.environ, sys.argv[0])
 
-import state
 from log import err
 
-if len(sys.argv[1:]) != 0:
+if len(sys.argv) != 1:
     err('%s: no arguments expected.\n' % sys.argv[0])
     sys.exit(1)
 
-for f in state.files():
-    if f.name.startswith('//'):
-        continue  # special name, ignore
-    if not f.is_generated and f.stamp_not_missing():
+for f in bc.files():
+    if not (f.special() or f.is_generated) and f.stamp_not_missing():
         print f.nicename()
