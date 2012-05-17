@@ -2,9 +2,9 @@
 import sys, os
 
 import build_context
-build_context.init(os.environ, sys.argv[0])
+bc = build_context.init(os.environ, sys.argv[0])
 
-import vars, state
+import state
 from log import err
 
 if len(sys.argv) != 1:
@@ -25,5 +25,5 @@ def make_cache():
 
 for f in state.files():
     if f.is_generated and f.stamp_not_missing():
-        if f.is_dirty(max_changed=vars.RUNID, **make_cache()):
+        if f.is_dirty(max_changed=bc.RUNID, **make_cache()):
             print f.nicename()

@@ -36,7 +36,6 @@ if deps:
 # persists from up above, because we don't want to do OOB now either.
 # (Actually it's most important for the primary target, since it's the one
 # who initiated the OOB in the first place.)
-#bc.set_unlocked()
-os.environ['REDO_UNLOCKED'] = '1'
+bc.set_unlocked()
 argv = ['redo-ifchange', target]
 sys.exit(os.spawnvp(os.P_WAIT, argv[0], argv))

@@ -8,6 +8,7 @@ from os.path import (
     join,
     split,
     )
+from atoi import atoi
 
 
 def toplevel(env):
@@ -78,6 +79,8 @@ class BuildContext(object):
 
     def __init__(self, env):
         self.env = env
+        self.RUNID = atoi(self.env.get('REDO_RUNID')) or None
+        assert self.RUNID, repr(self.RUNID)
 
     def target_name(self):
         PWD = self.env['REDO_PWD']
@@ -87,6 +90,10 @@ class BuildContext(object):
 
     def set_unlocked(self):
         self.env['REDO_UNLOCKED'] = '1'
+
+    def unlocked(self):
+        return bool(self.env.get('REDO_UNLOCKED'))
+
 
 
 if __name__ == '__main__':
