@@ -69,24 +69,32 @@ def init(env, exename, *targets):
         env['REDO_STARTDIR'] = cwd = getcwd()
         env['REDO_BASE'] = find_redo_root(common_base(cwd, targets))
 
-        import state
-        state.init()
-
-    return BuildContext(env)
+    import state
+    state.init()
+    return BuildContext(env, state.File, state.commit)
 
 
 class BuildContext(object):
 
-    def __init__(self, env):
+    def __init__(self, env, file_class, commit):
         self.env = env
+        self.file_class = file_class
+        self.commit = commit
+        # RUNID is initialized in state.init().
         self.RUNID = atoi(self.env.get('REDO_RUNID')) or None
         assert self.RUNID, repr(self.RUNID)
 
-    def target_name(self):
+    def target_full_path(self):
+        STARTDIR = self.env['REDO_STARTDIR']
         PWD = self.env['REDO_PWD']
         TARGET = self.env['REDO_TARGET']
-        STARTDIR = self.env['REDO_STARTDIR']
         return join(STARTDIR, PWD, TARGET)
+
+    def target_name(self):
+        return self.env['REDO_TARGET']
+
+    def target_file(self):
+        return self.file_from_name(self.target_full_path())
 
     def set_unlocked(self):
         self.env['REDO_UNLOCKED'] = '1'
@@ -94,6 +102,8 @@ class BuildContext(object):
     def unlocked(self):
         return bool(self.env.get('REDO_UNLOCKED'))
 
+    def file_from_name(self, name):
+        return self.file_class(name=name)
 
 
 if __name__ == '__main__':

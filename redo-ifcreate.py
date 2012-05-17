@@ -9,7 +9,7 @@ from log import err
 
 
 try:
-    f = state.File(name=bc.target_name())
+    f = state.File(name=bc.target_full_path())
     for t in sys.argv[1:]:
         if os.path.exists(t):
             err('redo-ifcreate: error: %r already exists\n' % t)

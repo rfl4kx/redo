@@ -13,6 +13,13 @@ STAMP_MISSING='0'   # the stamp of a nonexistent file
 CLEAN = 0
 DIRTY = 1
 
+
+class ImmediateReturn(Exception):
+    def __init__(self, rv):
+        Exception.__init__(self, "immediate return with exit code %d" % rv)
+        self.rv = rv
+
+
 def _connect(dbfile):
     _db = sqlite3.connect(dbfile, timeout=TIMEOUT)
     _db.execute("pragma synchronous = off")
@@ -226,6 +233,14 @@ class File(object):
         _write('delete from Deps where target=? and delete_me=1', [self.id])
 
 # Stuff that doesn't use the db directly
+
+    def should_build(self, runid):
+        if self.is_failed():
+            raise ImmediateReturn(32)
+        dirty = self.is_dirty(max_changed=runid)
+        if dirty == [self]:
+            return DIRTY
+        return dirty
 
     def set_checked(self):
         self.checked_runid = vars_.RUNID

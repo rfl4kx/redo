@@ -17,12 +17,6 @@ def _nice(t):
     return state.relpath(t, vars_.STARTDIR)
 
 
-class ImmediateReturn(Exception):
-    def __init__(self, rv):
-        Exception.__init__(self, "immediate return with exit code %d" % rv)
-        self.rv = rv
-
-
 class BuildJob:
     def __init__(self, sf, lock, shouldbuildfunc, donefunc):
         self.sf = sf
@@ -39,7 +33,7 @@ class BuildJob:
             if not dirty:
                 # target doesn't need to be built; skip the whole task
                 return self._report_results_and_unlock(0)
-        except ImmediateReturn, e:
+        except state.ImmediateReturn, e:
             return self._report_results_and_unlock(e.rv)
 
         if vars_.NO_OOB or dirty == True:
