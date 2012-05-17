@@ -6,7 +6,6 @@ import sys, os
 import build_context
 bc = build_context.init(os.environ, *sys.argv)
 
-import state
 from log import err
 
 if len(sys.argv) < 3:
@@ -20,7 +19,7 @@ if target in deps:
     err('%s: circular dependency.\n' % target)
     sys.exit(1)
 
-me = state.File(name=target)
+me = bc.file_from_name(target)
 
 # Build the known dependencies of our primary target.  This *does* require
 # grabbing locks.

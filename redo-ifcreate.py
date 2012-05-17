@@ -4,18 +4,17 @@ import build_context
 
 bc = build_context.init(os.environ, *sys.argv)
 
-import vars, state
 from log import err
 
 
 try:
-    f = state.File(name=bc.target_full_path())
+    f = bc.target_file()
     for t in sys.argv[1:]:
         if os.path.exists(t):
             err('redo-ifcreate: error: %r already exists\n' % t)
             sys.exit(1)
         else:
             f.add_dep('c', t)
-    state.commit()
+    bc.commit()
 except KeyboardInterrupt:
     sys.exit(200)
