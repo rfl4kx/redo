@@ -19,7 +19,6 @@ if os.isatty(0):
 
 import build_context
 bc = build_context.init(os.environ, sys.argv[0])
-
 from log import err, debug2
 
 sh = sha()

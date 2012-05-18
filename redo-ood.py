@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import sys, os
-
 import build_context
+
 bc = build_context.init(os.environ, sys.argv[0])
 
 from log import err

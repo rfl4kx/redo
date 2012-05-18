@@ -2,8 +2,6 @@
 import sys, os
 import build_context
 from builder import ALWAYS, STAMP_MISSING
-from log import err
-
 
 bc = build_context.init(os.environ, sys.argv[0])
 

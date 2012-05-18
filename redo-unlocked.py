@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import sys, os
 import build_context
+
 build_context.inside_do_script_guard()
 bc = build_context.init(os.environ, *sys.argv)
 
@@ -10,23 +11,19 @@ if len(sys.argv) < 3:
     err('%s: at least 2 arguments expected.\n' % sys.argv[0])
     sys.exit(1)
 
-target = sys.argv[1]
-deps = sys.argv[2:]
+target, deps = sys.argv[1], sys.argv[2:]
 
 if target in deps:
     err('%s: circular dependency.\n' % target)
     sys.exit(1)
 
-me = bc.file_from_name(target)
-
 # Build the known dependencies of our primary target.  This *does* require
 # grabbing locks.
 bc.set_no_oob()
-if deps:
-    argv = ['redo-ifchange'] + deps
-    rv = os.spawnvp(os.P_WAIT, argv[0], argv)
-    if rv:
-        sys.exit(rv)
+argv = ['redo-ifchange'] + deps
+rv = os.spawnvp(os.P_WAIT, argv[0], argv)
+if rv:
+    sys.exit(rv)
 
 # We know our caller already owns the lock on target, so we don't have to
 # acquire another one; tell redo-ifchange about that.  Also, REDO_NO_OOB
