@@ -8,6 +8,9 @@ from os.path import (
     join,
     split,
     )
+import db
+from builder import File
+from log import warn
 from helpers import atoi
 
 
@@ -74,17 +77,31 @@ def init(env, exename, *targets):
 
 class BuildContext(object):
 
+    file_class = File
+    files = File.files
+
     def __init__(self, env):
         self.env = env
-        import builder
-        builder.init()
-        self.file_class = builder.File
-        self.commit = builder.commit
-        self.files = builder.File.files
-        self.check_sane = builder.check_sane
-        # RUNID is initialized in builder.init().
         self.RUNID = atoi(self.env.get('REDO_RUNID')) or None
+        self.BASE = self.env['REDO_BASE']
+        db.db(self) # RUNID & REDO_RUNID are set in this call if they
+                    # were previously None/undefined.
         assert self.RUNID, repr(self.RUNID)
+        self.relpath = db.relpath
+        self.DEPTH = self.env.get('REDO_DEPTH', '')
+        self.DEBUG = atoi(self.env.get('REDO_DEBUG', ''))
+        self.DEBUG_LOCKS = self.env.get('REDO_DEBUG_LOCKS', '') and 1 or 0
+        self.DEBUG_PIDS = self.env.get('REDO_DEBUG_PIDS', '') and 1 or 0
+        self.OLD_ARGS = self.env.get('REDO_OLD_ARGS', '') and 1 or 0
+        self.VERBOSE = self.env.get('REDO_VERBOSE', '') and 1 or 0
+        self.XTRACE = self.env.get('REDO_XTRACE', '') and 1 or 0
+        self.KEEP_GOING = self.env.get('REDO_KEEP_GOING', '') and 1 or 0
+        self.SHUFFLE = self.env.get('REDO_SHUFFLE', '') and 1 or 0
+        self.STARTDIR = self.env.get('REDO_STARTDIR', '')
+        self.UNLOCKED = self.env.get('REDO_UNLOCKED', '') and 1 or 0
+        self.env['REDO_UNLOCKED'] = ''  # not inheritable by subprocesses
+        self.NO_OOB = self.env.get('REDO_NO_OOB', '') and 1 or 0
+        self.env['REDO_NO_OOB'] = ''    # not inheritable by subprocesses
 
     def target_full_path(self):
         STARTDIR = self.env['REDO_STARTDIR']
@@ -102,13 +119,28 @@ class BuildContext(object):
         self.env['REDO_UNLOCKED'] = '1'
 
     def unlocked(self):
-        return bool(self.env.get('REDO_UNLOCKED'))
+        return self.UNLOCKED
 
     def file_from_name(self, name):
-        return self.file_class(name=name)
+        return self.file_class(self, name=name)
 
     def file_from_id(self, id_):
-        return self.file_class(id=id_)
+        return self.file_class(self, id=id_)
+
+    def check_sane(self):
+        return db.check_sane(self.BASE)
+
+    def commit(self):
+        db.commit(self)
+
+    def warn_about_existing_ungenerated(self, targets):
+        for t in targets:
+            if exists(t):
+                f = self.file_from_name(t)
+                if not f.is_generated:
+                    warn('%s: exists and not marked as generated; not redoing.\n'
+                         % f.nicename())
+
 
 
 if __name__ == '__main__':

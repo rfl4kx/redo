@@ -1,5 +1,6 @@
 import sys, os
-import vars
+from helpers import atoi
+
 
 # By default, no output colouring.
 RED    = ""
@@ -7,6 +8,7 @@ GREEN  = ""
 YELLOW = ""
 BOLD   = ""
 PLAIN  = ""
+
 
 if sys.stderr.isatty() and (os.environ.get('TERM') or 'dumb') != 'dumb':
     # ...use ANSI formatting codes.
@@ -17,9 +19,14 @@ if sys.stderr.isatty() and (os.environ.get('TERM') or 'dumb') != 'dumb':
     PLAIN  = "\x1b[m"
 
 
+DEBUG = atoi(os.environ.get('REDO_DEBUG', ''))
+DEPTH = os.environ.get('REDO_DEPTH', '')
+DEBUG_PIDS = os.environ.get('REDO_DEBUG_PIDS', '')
+
+
 def log_(s):
     sys.stdout.flush()
-    if vars.DEBUG_PIDS:
+    if DEBUG_PIDS:
         sys.stderr.write('%d %s' % (os.getpid(), s))
     else:
         sys.stderr.write(s)
@@ -27,23 +34,23 @@ def log_(s):
 
 
 def log(s):
-    log_(''.join([GREEN,  "redo  ", vars.DEPTH, BOLD, s, PLAIN]))
+    log_(''.join([GREEN,  "redo  ", DEPTH, BOLD, s, PLAIN]))
 
 def err(s):
-    log_(''.join([RED,    "redo  ", vars.DEPTH, BOLD, s, PLAIN]))
+    log_(''.join([RED,    "redo  ", DEPTH, BOLD, s, PLAIN]))
 
 def warn(s):
-    log_(''.join([YELLOW, "redo  ", vars.DEPTH, BOLD, s, PLAIN]))
+    log_(''.join([YELLOW, "redo  ", DEPTH, BOLD, s, PLAIN]))
 
 
 def debug(s):
-    if vars.DEBUG >= 1:
-        log_('redo: %s%s' % (vars.DEPTH, s))
+    if DEBUG >= 1:
+        log_('redo: %s%s' % (DEPTH, s))
 def debug2(s):
-    if vars.DEBUG >= 2:
-        log_('redo: %s%s' % (vars.DEPTH, s))
+    if DEBUG >= 2:
+        log_('redo: %s%s' % (DEPTH, s))
 def debug3(s):
-    if vars.DEBUG >= 3:
-        log_('redo: %s%s' % (vars.DEPTH, s))
+    if DEBUG >= 3:
+        log_('redo: %s%s' % (DEPTH, s))
 
 

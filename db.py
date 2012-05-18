@@ -1,5 +1,4 @@
 import sys, os, errno, glob, stat, fcntl, sqlite3
-import vars as vars_
 from helpers import unlink, close_on_exec, join, try_stat, possible_do_files
 from log import log, warn, err, debug, debug2, debug3
 
@@ -17,12 +16,12 @@ def _connect(dbfile):
 
 
 _db = None
-def db():
+def db(bc):
     global _db
     if _db:
         return _db
-        
-    dbdir = '%s/.redo' % vars_.BASE
+
+    dbdir = '%s/.redo' % bc.BASE
     dbfile = '%s/db.sqlite3' % dbdir
     try:
         os.mkdir(dbdir)
@@ -75,39 +74,39 @@ def db():
                     "     ((select max(id)+1 from Runid))")
         _db.execute("insert into Files (name) values (?)", [ALWAYS])
 
-    if not vars_.RUNID:
+    if not bc.RUNID:
         _db.execute("insert into Runid values "
                     "     ((select max(id)+1 from Runid))")
-        vars_.RUNID = _db.execute("select last_insert_rowid()").fetchone()[0]
-        os.environ['REDO_RUNID'] = str(vars_.RUNID)
+        bc.RUNID = _db.execute("select last_insert_rowid()").fetchone()[0]
+        os.environ['REDO_RUNID'] = str(bc.RUNID)
     
     _db.commit()
     return _db
     
 
 _wrote = 0
-def _write(q, l):
+def _write(bc, q, l):
     if _insane:
         return
     global _wrote
     _wrote += 1
-    db().execute(q, l)
+    db(bc).execute(q, l)
 
 
-def commit():
+def commit(bc):
     if _insane:
         return
     global _wrote
     if _wrote:
-        db().commit()
+        db(bc).commit()
         _wrote = 0
 
 
 _insane = None
-def check_sane():
+def check_sane(BASE):
     global _insane, _writable
     if not _insane:
-        _insane = not os.path.exists('%s/.redo' % vars_.BASE)
+        _insane = not os.path.exists('%s/.redo' % (BASE,))
     return not _insane
 
 
@@ -149,19 +148,20 @@ class FileDBMixin(object):
             q += 'where rowid=?'
             l = [id]
         elif name != None:
-            name = (name==ALWAYS) and ALWAYS or relpath(name, vars_.BASE)
+            global _bc
+            name = (name==ALWAYS) and ALWAYS or relpath(name, self.bc.BASE)
             q += 'where name=?'
             l = [name]
         else:
             raise Exception('name or id must be set')
-        d = db()
+        d = db(self.bc)
         row = d.execute(q, l).fetchone()
         if not row:
             if not name:
                 raise Exception('File with id=%r not found and '
                                 'name not given' % id)
             try:
-                _write('insert into Files (name) values (?)', [name])
+                _write(self.bc, 'insert into Files (name) values (?)', [name])
             except sqlite3.IntegrityError:
                 # some parallel redo probably added it at the same time; no
                 # big deal.
@@ -174,12 +174,12 @@ class FileDBMixin(object):
         (self.id, self.name, self.is_generated, self.is_override,
          self.checked_runid, self.changed_runid, self.failed_runid,
          self.stamp, self.csum) = cols
-        if self.name == ALWAYS and self.changed_runid < vars_.RUNID:
-            self.changed_runid = vars_.RUNID
+        if self.name == ALWAYS and self.changed_runid < self.bc.RUNID:
+            self.changed_runid = self.bc.RUNID
     
     def save(self):
         cols = join(', ', ['%s=?'%i for i in _file_cols[2:]])
-        _write('update Files set '
+        _write(self.bc, 'update Files set '
                '    %s '
                '    where rowid=?' % cols,
                [self.is_generated, self.is_override,
@@ -188,10 +188,10 @@ class FileDBMixin(object):
                 self.id])
 
     def add_dep(self, mode, dep):
-        src = self.__class__(name=dep)
+        src = self.__class__(self.bc, name=dep)
         debug3('add-dep: "%s" < %s "%s"\n' % (self.name, mode, src.name))
         assert self.id != src.id
-        _write("insert or replace into Deps "
+        _write(self.bc, "insert or replace into Deps "
                "    (target, mode, source, delete_me) values (?,?,?,?)",
                [self.id, mode, src.id, False])
 
@@ -200,22 +200,22 @@ class FileDBMixin(object):
              '  from Files '
              '    join Deps on Files.rowid = Deps.source '
              '  where target=?' % join(', ', _file_cols[1:]))
-        for row in db().execute(q, [self.id]).fetchall():
+        for row in db(self.bc).execute(q, [self.id]).fetchall():
             mode = row[0]
             cols = row[1:]
             assert mode in ('c', 'm')
-            yield mode, self.__class__(cols=cols)
+            yield mode, self.__class__(self.bc, cols=cols)
 
     def _zap_deps1(self):
         debug2('zap-deps1: %r\n' % self.name)
-        _write('update Deps set delete_me=? where target=?', [True, self.id])
+        _write(self.bc, 'update Deps set delete_me=? where target=?', [True, self.id])
 
     def _zap_deps2(self):
         debug2('zap-deps2: %r\n' % self.name)
-        _write('delete from Deps where target=? and delete_me=1', [self.id])
+        _write(self.bc, 'delete from Deps where target=? and delete_me=1', [self.id])
 
     @classmethod
     def files(class_):
         q = ('select %s from Files order by name' % join(', ', _file_cols))
-        for cols in db().execute(q).fetchall():
+        for cols in db(self.bc).execute(q).fetchall():
             yield class_(cols=cols)

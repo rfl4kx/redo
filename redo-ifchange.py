@@ -1,10 +1,9 @@
 #!/usr/bin/env python
 import sys, os
 
-import build_context
+import build_context, builder, jwack
 bc = build_context.init(os.environ, *sys.argv)
 
-import builder, jwack
 from log import debug2
 
 

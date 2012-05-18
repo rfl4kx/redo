@@ -1,18 +1,20 @@
 #!/usr/bin/env python
 import sys, os
-import vars, builder
+import build_context
+from builder import ALWAYS, STAMP_MISSING
 from log import err
 
 
+bc = build_context.init(os.environ, sys.argv[0])
+
+
 try:
-    me = os.path.join(vars.STARTDIR, 
-                      os.path.join(vars.PWD, vars.TARGET))
-    f = builder.File(name=me)
-    f.add_dep('m', builder.ALWAYS)
-    always = builder.File(name=builder.ALWAYS)
-    always.stamp = builder.STAMP_MISSING
+    f = bc.target_file()
+    f.add_dep('m', ALWAYS)
+    always = bc.file_from_name(ALWAYS)
+    always.stamp = STAMP_MISSING
     always.set_changed()
     always.save()
-    builder.commit()
+    bc.commit()
 except KeyboardInterrupt:
     sys.exit(200)

@@ -1,8 +1,8 @@
 import sys, os, errno, stat, fcntl
-import vars as vars_, jwack
+import jwack
 from helpers import unlink, close_on_exec, join, try_stat, possible_do_files
 from log import log, log_, debug, debug2, debug3, err, warn
-from db import db as init, FileDBMixin, commit, check_sane, relpath, ALWAYS
+from db import FileDBMixin, relpath, ALWAYS
 
 
 STAMP_DIR='dir'     # the stamp of a directory; mtime is unhelpful
@@ -22,27 +22,22 @@ def warn_override(name):
     warn('%s - you modified it; skipping\n' % name)
 
 
-def warn_about_existing_ungenerated(targets):
-    for t in targets:
-        if os.path.exists(t):
-            f = File(name=t)
-            if not f.is_generated:
-                warn('%s: exists and not marked as generated; not redoing.\n'
-                     % f.nicename())
-
-
-def _nice(t):
-    return relpath(t, vars_.STARTDIR)
+def _nice(t, base):
+    return relpath(t, base)
 
 
 class BuildJob:
-    def __init__(self, sf, lock, shouldbuildfunc, donefunc):
+    def __init__(self, bc, sf, lock, shouldbuildfunc, donefunc):
+        self.bc = bc
         self.sf = sf
         self.tmpname1, self.tmpname2 = sf.get_tempfilenames()
         self.lock = lock
         self.shouldbuildfunc = shouldbuildfunc
         self.donefunc = donefunc
         self.before_t = sf.try_stat()
+
+    def _nice(self, t):
+        return relpath(t, self.bc.STARTDIR)
 
     def start(self):
         assert self.lock.owned
@@ -54,7 +49,7 @@ class BuildJob:
         except ImmediateReturn, e:
             return self._report_results_and_unlock(e.rv)
 
-        if vars_.NO_OOB or dirty == True:
+        if self.bc.NO_OOB or dirty == True:
             self._start_do()
         else:
             self._start_unlocked(dirty)
@@ -65,7 +60,7 @@ class BuildJob:
         sf = self.sf
 
         if sf.check_externally_modified():
-            warn_override(_nice(t))
+            warn_override(self._nice(t))
             sf.set_externally_modified()
             return self._report_results_and_unlock(0)
 
@@ -92,16 +87,16 @@ class BuildJob:
                 return self._report_results_and_unlock(1)
                 
         self.argv = self._setup_argv(dodir, dofile, basename, ext)
-        log('%s\n' % _nice(t))
+        log('%s\n' % self._nice(t))
         self.dodir = dodir
         self.basename = basename
         self.ext = ext
         sf.is_generated = True
         sf.save()
-        dof = File(name=os.path.join(dodir, dofile))
+        dof = File(self.bc, name=os.path.join(dodir, dofile))
         dof.set_static()
         dof.save()
-        commit()
+        self.bc.commit()
         jwack.start_job(t, self._do_subproc, self._after)
 
     def _start_unlocked(self, dirty):
@@ -116,11 +111,11 @@ class BuildJob:
         # condition; that's why it's called redo-unlocked, because it doesn't
         # grab a lock.
         argv = ['redo-unlocked', self.sf.name] + [d.name for d in dirty]
-        log('(%s)\n' % _nice(self.sf.t))
-        commit()
+        log('(%s)\n' % self._nice(self.sf.t))
+        self.bc.commit()
         def run():
-            os.chdir(vars_.BASE)
-            os.environ['REDO_DEPTH'] = vars_.DEPTH + '  '
+            os.chdir(self.bc.BASE)
+            os.environ['REDO_DEPTH'] = self.bc.DEPTH + '  '
             os.execvp(argv[0], argv)
             assert 0
             # returns only if there's an exception
@@ -137,7 +132,7 @@ class BuildJob:
         self.f = os.fdopen(ffd, 'w+')
 
         # this will run in the dofile's directory, so use only basenames here
-        if vars_.OLD_ARGS:
+        if self.bc.OLD_ARGS:
             arg1 = basename  # target name (no extension)
             arg2 = ext       # extension (if any), including leading dot
         else:
@@ -149,14 +144,14 @@ class BuildJob:
                 arg1,
                 arg2,
                 # temp output file name
-                relpath(os.path.abspath(self.tmpname2), dodir),
+                self.bc.relpath(os.path.abspath(self.tmpname2), dodir),
                 ]
 
-        if vars_.VERBOSE:
+        if self.bc.VERBOSE:
             argv[1] += 'v'
-        if vars_.XTRACE:
+        if self.bc.XTRACE:
             argv[1] += 'x'
-        if vars_.VERBOSE or vars_.XTRACE:
+        if self.bc.VERBOSE or self.bc.XTRACE:
             log_('\n')
 
         firstline = open(os.path.join(dodir, dofile)).readline().strip()
@@ -173,15 +168,15 @@ class BuildJob:
         # now.
         dn = self.dodir
         newp = os.path.realpath(dn)
-        os.environ['REDO_PWD'] = relpath(newp, vars_.STARTDIR)
+        os.environ['REDO_PWD'] = self.bc.relpath(newp, self.bc.STARTDIR)
         os.environ['REDO_TARGET'] = self.basename + self.ext
-        os.environ['REDO_DEPTH'] = vars_.DEPTH + '  '
+        os.environ['REDO_DEPTH'] = self.bc.DEPTH + '  '
         if dn:
             os.chdir(dn)
         os.dup2(self.f.fileno(), 1)
         os.close(self.f.fileno())
         close_on_exec(1, False)
-        if vars_.VERBOSE or vars_.XTRACE:
+        if self.bc.VERBOSE or self.bc.XTRACE:
             log_('* %s\n' % ' '.join(self.argv))
         os.execvp(self.argv[0], self.argv)
         assert 0
@@ -190,9 +185,9 @@ class BuildJob:
     def _after(self, t, rv):
         assert t == self.sf.t
         try:
-            check_sane()
+            self.bc.check_sane()
             rv = self._check_results(t, rv)
-            commit()
+            self.bc.commit()
         finally:
             self._report_results_and_unlock(rv)
 
@@ -216,8 +211,8 @@ class BuildJob:
         self.sf.fin()
         f.close()
 
-        if vars_.VERBOSE or vars_.XTRACE or vars_.DEBUG:
-            log('%s (done)\n\n' % _nice(t))
+        if self.bc.VERBOSE or self.bc.XTRACE or self.bc.DEBUG:
+            log('%s (done)\n\n' % self._nice(t))
         return rv
 
     def _report_results_and_unlock(self, rv):
@@ -250,7 +245,7 @@ class BuildJob:
         unlink(self.tmpname2)
         self.sf.set_failed()
         self.f.close()
-        err('%s: exit code %d\n' % (_nice(self.sf.t), rv))
+        err('%s: exit code %d\n' % (self._nice(self.sf.t), rv))
 
     def _yeah(self, st1, st2):
         t = self.sf.t
@@ -274,7 +269,8 @@ class BuildJob:
 
 class File(FileDBMixin, object):
 
-    def __init__(self, id_=None, name=None, cols=None):
+    def __init__(self, bc, id_=None, name=None, cols=None):
+        self.bc = bc
         FileDBMixin.__init__(self, id_, name, cols)
 
 # Stuff that doesn't use the db directly
@@ -288,18 +284,18 @@ class File(FileDBMixin, object):
         return dirty
 
     def set_checked(self):
-        self.checked_runid = vars_.RUNID
+        self.checked_runid = self.bc.RUNID
 
     def set_changed(self):
         debug2('BUILT: %r (%r)\n' % (self.name, self.stamp))
-        self.changed_runid = vars_.RUNID
+        self.changed_runid = self.bc.RUNID
         self.failed_runid = None
         self.is_override = False
 
     def set_failed(self):
         debug2('FAILED: %r\n' % self.name)
         self._update_stamp()
-        self.failed_runid = vars_.RUNID
+        self.failed_runid = self.bc.RUNID
         self.is_generated = True
         self._zap_deps2()
         self.save()
@@ -310,13 +306,14 @@ class File(FileDBMixin, object):
         self.is_generated = False
 
     def is_failed(self):
-        return self.failed_runid and self.failed_runid >= vars_.RUNID
+        return self.failed_runid and self.failed_runid >= self.bc.RUNID
 
     def stamp_not_missing(self):
         return self._read_stamp() != STAMP_MISSING
 
     def nicename(self):
-        return relpath(os.path.join(vars_.BASE, self.name), vars_.STARTDIR)
+        return self.bc.relpath(os.path.join(self.bc.BASE, self.name),
+                               self.bc.STARTDIR)
 
     def special(self):
         return self.name.startswith('//')
@@ -354,7 +351,7 @@ class File(FileDBMixin, object):
 
     def find_do_file(self):
         self._zap_deps1()
-        for dodir, dofile, basedir, basename, ext in possible_do_files(self.name, vars_.BASE):
+        for dodir, dofile, basedir, basename, ext in possible_do_files(self.name, self.bc.BASE):
             dopath = os.path.join(dodir, dofile)
             debug2('%s: %s:%s ?\n' % (self.name, dodir, dofile))
             if os.path.exists(dopath):
@@ -367,7 +364,7 @@ class File(FileDBMixin, object):
                  is_checked=None, set_checked=None):
         is_checked = is_checked or File._is_checked
         set_checked = set_checked or File._set_checked_save
-        if vars_.DEBUG >= 1:
+        if self.bc.DEBUG >= 1:
             debug('%s?%s\n' % (depth, self.nicename()))
 
         if self.failed_runid:
@@ -380,7 +377,7 @@ class File(FileDBMixin, object):
             debug('%s-- DIRTY (built)\n' % depth)
             return DIRTY  # has been built more recently than parent
         if is_checked(self):
-            if vars_.DEBUG >= 1:
+            if self.bc.DEBUG >= 1:
                 debug('%s-- CLEAN (checked)\n' % depth)
             return CLEAN  # has already been checked during this session
         if not self.stamp:
@@ -403,7 +400,7 @@ class File(FileDBMixin, object):
             assert mode in ('c', 'm')
             dirty = CLEAN
             if mode == 'c':
-                if os.path.exists(os.path.join(vars_.BASE, f2.name)):
+                if os.path.exists(os.path.join(self.bc.BASE, f2.name)):
                     debug('%s-- DIRTY (created)\n' % depth)
                     dirty = DIRTY
             elif mode == 'm':
@@ -486,14 +483,14 @@ class File(FileDBMixin, object):
             self.set_changed()
 
     def _is_checked(self):
-        return self.checked_runid and self.checked_runid >= vars_.RUNID
+        return self.checked_runid and self.checked_runid >= self.bc.RUNID
 
     def _is_changed(self):
-        return self.changed_runid and self.changed_runid >= vars_.RUNID
+        return self.changed_runid and self.changed_runid >= self.bc.RUNID
 
     def _read_stamp(self):
         try:
-            st = os.stat(os.path.join(vars_.BASE, self.name))
+            st = os.stat(os.path.join(self.bc.BASE, self.name))
         except OSError:
             return STAMP_MISSING
         if stat.S_ISDIR(st.st_mode):
@@ -510,10 +507,10 @@ class File(FileDBMixin, object):
 # The makes debugging a bit harder.  When we someday port to C, we can do that.
 _locks = {}
 class Lock:
-    def __init__(self, fid):
+    def __init__(self, bc, fid):
         self.owned = False
         self.fid = fid
-        self.lockfile = os.open(os.path.join(vars_.BASE, '.redo/lock.%d' % fid),
+        self.lockfile = os.open(os.path.join(bc.BASE, '.redo/lock.%d' % fid),
                                 os.O_RDWR | os.O_CREAT, 0666)
         close_on_exec(self.lockfile, True)
         assert _locks.get(fid, 0) == 0
@@ -552,7 +549,7 @@ class Lock:
 
 def main(bc, targets, shouldbuildfunc):
     retcode = [0]  # a list so that it can be reassigned from done()
-    if vars_.SHUFFLE:
+    if bc.SHUFFLE:
         import random
         random.shuffle(targets)
 
@@ -573,24 +570,24 @@ def main(bc, targets, shouldbuildfunc):
         if not jwack.has_token():
             bc.commit()
         jwack.get_token(t)
-        if retcode[0] and not vars_.KEEP_GOING:
+        if retcode[0] and not bc.KEEP_GOING:
             break
         if not bc.check_sane():
             err('.redo directory disappeared; cannot continue.\n')
             retcode[0] = 205
             break
         f = bc.file_from_name(t)
-        lock = Lock(f.id)
-        if vars_.UNLOCKED:
+        lock = Lock(bc, f.id)
+        if bc.UNLOCKED:
             lock.owned = True
         else:
             lock.trylock()
         if not lock.owned:
-            if vars_.DEBUG_LOCKS:
-                log('%s (locked...)\n' % _nice(t))
+            if bc.DEBUG_LOCKS:
+                log('%s (locked...)\n' % _nice(t, bc.BASE))
             locked.append((f.id,t))
         else:
-            BuildJob(f, lock, shouldbuildfunc, done).start()
+            BuildJob(bc, f, lock, shouldbuildfunc, done).start()
 
     del lock
 
@@ -606,7 +603,7 @@ def main(bc, targets, shouldbuildfunc):
         jwack.wait_all()
         # at this point, we don't have any children holding any tokens, so
         # it's okay to block below.
-        if retcode[0] and not vars_.KEEP_GOING:
+        if retcode[0] and not bc.KEEP_GOING:
             break
         if locked:
             if not bc.check_sane():
@@ -614,11 +611,11 @@ def main(bc, targets, shouldbuildfunc):
                 retcode[0] = 205
                 break
             fid,t = locked.pop(0)
-            lock = Lock(fid)
+            lock = Lock(bc, fid)
             lock.trylock()
             while not lock.owned:
-                if vars_.DEBUG_LOCKS:
-                    warn('%s (WAITING)\n' % _nice(t))
+                if bc.DEBUG_LOCKS:
+                    warn('%s (WAITING)\n' % _nice(t, bc.BASE))
                 # this sequence looks a little silly, but the idea is to
                 # give up our personal token while we wait for the lock to
                 # be released; but we should never run get_token() while
@@ -629,14 +626,14 @@ def main(bc, targets, shouldbuildfunc):
                 jwack.get_token(t)
                 lock.trylock()
             assert lock.owned
-            if vars_.DEBUG_LOCKS:
-                log('%s (...unlocked!)\n' % _nice(t))
+            if bc.DEBUG_LOCKS:
+                log('%s (...unlocked!)\n' % _nice(t, bc.BASE))
             if bc.file_from_name(t).is_failed():
-                err('%s: failed in another thread\n' % _nice(t))
+                err('%s: failed in another thread\n' % _nice(t, bc.BASE))
                 retcode[0] = 2
                 lock.unlock()
             else:
-                BuildJob(bc.file_from_id(fid), lock,
+                BuildJob(bc, bc.file_from_id(fid), lock,
                          shouldbuildfunc, done).start()
     bc.commit()
     return retcode[0]

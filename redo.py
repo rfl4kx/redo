@@ -50,7 +50,7 @@ import builder, jwack
 from log import err
 
 try:
-    builder.warn_about_existing_ungenerated(targets)
+    bc.warn_about_existing_ungenerated(targets)
     j = atoi(opt.jobs or 1)
     if j < 1 or j > 1000:
         err('invalid --jobs value: %r\n' % opt.jobs)
