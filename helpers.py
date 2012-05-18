@@ -1,5 +1,11 @@
 import sys, os, errno, fcntl
-from atoi import atoi
+
+
+def atoi(v):
+    try:
+        return int(v or 0)
+    except ValueError:
+        return 0
 
 
 def inside_do_script_guard():

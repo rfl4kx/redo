@@ -8,7 +8,7 @@ from os.path import (
     join,
     split,
     )
-from atoi import atoi
+from helpers import atoi
 
 
 def toplevel(env):
