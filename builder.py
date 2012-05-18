@@ -115,7 +115,7 @@ class BuildJob:
         self.bc.commit()
         def run():
             os.chdir(self.bc.BASE)
-            os.environ['REDO_DEPTH'] = self.bc.DEPTH + '  '
+            self.bc.incr_DEPTH()
             os.execvp(argv[0], argv)
             assert 0
             # returns only if there's an exception
@@ -167,10 +167,8 @@ class BuildJob:
         # than we started it in.  So os.getcwd() might be != REDO_PWD right
         # now.
         dn = self.dodir
-        newp = os.path.realpath(dn)
-        os.environ['REDO_PWD'] = self.bc.relpath(newp, self.bc.STARTDIR)
-        os.environ['REDO_TARGET'] = self.basename + self.ext
-        os.environ['REDO_DEPTH'] = self.bc.DEPTH + '  '
+        self.bc.set_subprocess_context(dn, self.basename + self.ext)
+        self.bc.incr_DEPTH()
         if dn:
             os.chdir(dn)
         os.dup2(self.f.fileno(), 1)

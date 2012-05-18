@@ -1,4 +1,4 @@
-from os import getcwd
+from os import getcwd, environ
 from os.path import (
     abspath,
     realpath,
@@ -17,6 +17,14 @@ from helpers import atoi
 def toplevel(env):
     '''Return True is this is a toplevel call to redo'''
     return 'REDO' not in env
+
+
+def inside_do_script_guard():
+    if toplevel(environ):
+        import sys
+        sys.stderr.write('%s: error: must be run from inside a .do\n'
+                         % sys.argv[0])
+        sys.exit(100)
 
 
 def get_paths(exename):
@@ -115,6 +123,9 @@ class BuildContext(object):
     def target_file(self):
         return self.file_from_name(self.target_full_path())
 
+    def set_no_oob(self):
+        self.env['REDO_NO_OOB'] = '1'
+
     def set_unlocked(self):
         self.env['REDO_UNLOCKED'] = '1'
 
@@ -141,6 +152,12 @@ class BuildContext(object):
                     warn('%s: exists and not marked as generated; not redoing.\n'
                          % f.nicename())
 
+    def incr_DEPTH(self):
+        self.env['REDO_DEPTH'] = self.DEPTH + '  '
+
+    def set_subprocess_context(self, newp, target):
+        self.env['REDO_PWD'] = self.relpath(realpath(newp), self.STARTDIR)
+        self.env['REDO_TARGET'] = target
 
 
 if __name__ == '__main__':

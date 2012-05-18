@@ -1,9 +1,7 @@
 #!/usr/bin/env python
-from helpers import inside_do_script_guard
-inside_do_script_guard()
-
 import sys, os
 import build_context
+build_context.inside_do_script_guard()
 bc = build_context.init(os.environ, *sys.argv)
 
 from log import err
@@ -23,7 +21,7 @@ me = bc.file_from_name(target)
 
 # Build the known dependencies of our primary target.  This *does* require
 # grabbing locks.
-os.environ['REDO_NO_OOB'] = '1'
+bc.set_no_oob()
 if deps:
     argv = ['redo-ifchange'] + deps
     rv = os.spawnvp(os.P_WAIT, argv[0], argv)
