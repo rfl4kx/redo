@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import sys, os
-import vars, state
+import vars, builder
 from log import err, debug2
 
 if len(sys.argv) > 1:
@@ -35,7 +35,7 @@ if not vars.TARGET:
 
 me = os.path.join(vars.STARTDIR, 
                   os.path.join(vars.PWD, vars.TARGET))
-f = state.File(name=me)
+f = builder.File(name=me)
 changed = (csum != f.csum)
 debug2('%s: old = %s\n' % (f.name, f.csum))
 debug2('%s: sum = %s (%s)\n' % (f.name, csum,
@@ -50,4 +50,4 @@ else:
     # unchanged
     f.set_checked()
 f.save()
-state.commit()
+builder.commit()

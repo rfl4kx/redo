@@ -44,7 +44,7 @@ if opt.old_args:
     os.environ['REDO_OLD_ARGS'] = '1'
 
 import build_context
-build_context.init(os.environ, sys.argv[0], *targets)
+bc = build_context.init(os.environ, sys.argv[0], *targets)
 
 import builder, jwack
 from log import err
@@ -56,7 +56,7 @@ try:
         err('invalid --jobs value: %r\n' % opt.jobs)
     jwack.setup(j)
     try:
-        retcode = builder.main(targets, lambda t: True)
+        retcode = builder.main(bc, targets, lambda t: True)
     finally:
         jwack.force_return_tokens()
     sys.exit(retcode)

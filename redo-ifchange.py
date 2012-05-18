@@ -27,7 +27,7 @@ try:
         debug2('redo-ifchange: not adding depends.\n')
 
     try:
-        rv = builder.main(targets, should_build)
+        rv = builder.main(bc, targets, should_build)
     finally:
         jwack.force_return_tokens()
 

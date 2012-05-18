@@ -69,19 +69,20 @@ def init(env, exename, *targets):
         env['REDO_STARTDIR'] = cwd = getcwd()
         env['REDO_BASE'] = find_redo_root(common_base(cwd, targets))
 
-    import state
-    state.init()
-    return BuildContext(env, state.File, state.commit, state.files)
+    return BuildContext(env)
 
 
 class BuildContext(object):
 
-    def __init__(self, env, file_class, commit, files):
+    def __init__(self, env):
         self.env = env
-        self.file_class = file_class
-        self.commit = commit
-        self.files = files
-        # RUNID is initialized in state.init().
+        import builder
+        builder.init()
+        self.file_class = builder.File
+        self.commit = builder.commit
+        self.files = builder.File.files
+        self.check_sane = builder.check_sane
+        # RUNID is initialized in builder.init().
         self.RUNID = atoi(self.env.get('REDO_RUNID')) or None
         assert self.RUNID, repr(self.RUNID)
 
@@ -105,6 +106,9 @@ class BuildContext(object):
 
     def file_from_name(self, name):
         return self.file_class(name=name)
+
+    def file_from_id(self, id_):
+        return self.file_class(id=id_)
 
 
 if __name__ == '__main__':

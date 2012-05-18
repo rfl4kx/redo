@@ -1,20 +1,38 @@
-import sys, os, errno, stat
-import vars as vars_, jwack, state
-from helpers import unlink, close_on_exec, join, try_stat
-from log import log, log_, debug, debug2, err, warn
+import sys, os, errno, stat, fcntl
+import vars as vars_, jwack
+from helpers import unlink, close_on_exec, join, try_stat, possible_do_files
+from log import log, log_, debug, debug2, debug3, err, warn
+from db import db as init, FileDBMixin, commit, check_sane, relpath, ALWAYS
+
+
+STAMP_DIR='dir'     # the stamp of a directory; mtime is unhelpful
+STAMP_MISSING='0'   # the stamp of a nonexistent file
+
+CLEAN = 0
+DIRTY = 1
+
+
+class ImmediateReturn(Exception):
+    def __init__(self, rv):
+        Exception.__init__(self, "immediate return with exit code %d" % rv)
+        self.rv = rv
+
+
+def warn_override(name):
+    warn('%s - you modified it; skipping\n' % name)
 
 
 def warn_about_existing_ungenerated(targets):
     for t in targets:
         if os.path.exists(t):
-            f = state.File(name=t)
+            f = File(name=t)
             if not f.is_generated:
                 warn('%s: exists and not marked as generated; not redoing.\n'
                      % f.nicename())
 
 
 def _nice(t):
-    return state.relpath(t, vars_.STARTDIR)
+    return relpath(t, vars_.STARTDIR)
 
 
 class BuildJob:
@@ -33,7 +51,7 @@ class BuildJob:
             if not dirty:
                 # target doesn't need to be built; skip the whole task
                 return self._report_results_and_unlock(0)
-        except state.ImmediateReturn, e:
+        except ImmediateReturn, e:
             return self._report_results_and_unlock(e.rv)
 
         if vars_.NO_OOB or dirty == True:
@@ -47,7 +65,7 @@ class BuildJob:
         sf = self.sf
 
         if sf.check_externally_modified():
-            state.warn_override(_nice(t))
+            warn_override(_nice(t))
             sf.set_externally_modified()
             return self._report_results_and_unlock(0)
 
@@ -80,10 +98,10 @@ class BuildJob:
         self.ext = ext
         sf.is_generated = True
         sf.save()
-        dof = state.File(name=os.path.join(dodir, dofile))
+        dof = File(name=os.path.join(dodir, dofile))
         dof.set_static()
         dof.save()
-        state.commit()
+        commit()
         jwack.start_job(t, self._do_subproc, self._after)
 
     def _start_unlocked(self, dirty):
@@ -99,7 +117,7 @@ class BuildJob:
         # grab a lock.
         argv = ['redo-unlocked', self.sf.name] + [d.name for d in dirty]
         log('(%s)\n' % _nice(self.sf.t))
-        state.commit()
+        commit()
         def run():
             os.chdir(vars_.BASE)
             os.environ['REDO_DEPTH'] = vars_.DEPTH + '  '
@@ -131,7 +149,7 @@ class BuildJob:
                 arg1,
                 arg2,
                 # temp output file name
-                state.relpath(os.path.abspath(self.tmpname2), dodir),
+                relpath(os.path.abspath(self.tmpname2), dodir),
                 ]
 
         if vars_.VERBOSE:
@@ -155,7 +173,7 @@ class BuildJob:
         # now.
         dn = self.dodir
         newp = os.path.realpath(dn)
-        os.environ['REDO_PWD'] = state.relpath(newp, vars_.STARTDIR)
+        os.environ['REDO_PWD'] = relpath(newp, vars_.STARTDIR)
         os.environ['REDO_TARGET'] = self.basename + self.ext
         os.environ['REDO_DEPTH'] = vars_.DEPTH + '  '
         if dn:
@@ -172,9 +190,9 @@ class BuildJob:
     def _after(self, t, rv):
         assert t == self.sf.t
         try:
-            state.check_sane()
+            check_sane()
             rv = self._check_results(t, rv)
-            state.commit()
+            commit()
         finally:
             self._report_results_and_unlock(rv)
 
@@ -254,7 +272,285 @@ class BuildJob:
             unlink(t)
 
 
-def main(targets, shouldbuildfunc):
+class File(FileDBMixin, object):
+
+    def __init__(self, id_=None, name=None, cols=None):
+        FileDBMixin.__init__(self, id_, name, cols)
+
+# Stuff that doesn't use the db directly
+
+    def should_build(self, runid):
+        if self.is_failed():
+            raise ImmediateReturn(32)
+        dirty = self.is_dirty(max_changed=runid)
+        if dirty == [self]:
+            return DIRTY
+        return dirty
+
+    def set_checked(self):
+        self.checked_runid = vars_.RUNID
+
+    def set_changed(self):
+        debug2('BUILT: %r (%r)\n' % (self.name, self.stamp))
+        self.changed_runid = vars_.RUNID
+        self.failed_runid = None
+        self.is_override = False
+
+    def set_failed(self):
+        debug2('FAILED: %r\n' % self.name)
+        self._update_stamp()
+        self.failed_runid = vars_.RUNID
+        self.is_generated = True
+        self._zap_deps2()
+        self.save()
+
+    def set_static(self):
+        self._update_stamp(must_exist=True)
+        self.is_override = False
+        self.is_generated = False
+
+    def is_failed(self):
+        return self.failed_runid and self.failed_runid >= vars_.RUNID
+
+    def stamp_not_missing(self):
+        return self._read_stamp() != STAMP_MISSING
+
+    def nicename(self):
+        return relpath(os.path.join(vars_.BASE, self.name), vars_.STARTDIR)
+
+    def special(self):
+        return self.name.startswith('//')
+
+    def get_tempfilenames(self):
+        tmpbase = self.t
+        while not os.path.isdir(os.path.dirname(tmpbase) or '.'):
+            ofs = tmpbase.rfind('/')
+            assert ofs >= 0
+            tmpbase = tmpbase[:ofs] + '__' + tmpbase[ofs + 1:]
+        return ('%s.redo1.tmp' % tmpbase), ('%s.redo2.tmp' % tmpbase)
+
+    def try_stat(self):
+        return try_stat(self.t)
+
+    def check_externally_modified(self):
+        newstamp = self._read_stamp()
+        return (self.is_generated and
+                newstamp != STAMP_MISSING and
+                (self.stamp != newstamp or self.is_override))
+
+    def set_externally_modified(self):
+        self._set_override()
+        self.set_checked()
+        self.save()
+
+    def existing_not_generated(self):
+        return (os.path.exists(self.t) and
+                not os.path.isdir(self.t + '/.') and
+                not self.is_generated)
+
+    def set_something_else(self):
+        self.set_static()
+        self.save()
+
+    def find_do_file(self):
+        self._zap_deps1()
+        for dodir, dofile, basedir, basename, ext in possible_do_files(self.name, vars_.BASE):
+            dopath = os.path.join(dodir, dofile)
+            debug2('%s: %s:%s ?\n' % (self.name, dodir, dofile))
+            if os.path.exists(dopath):
+                self.add_dep('m', dopath)
+                return dodir, dofile, basedir, basename, ext
+            self.add_dep('c', dopath)
+        return None, None, None, None, None
+
+    def is_dirty(self, max_changed, depth='',
+                 is_checked=None, set_checked=None):
+        is_checked = is_checked or File._is_checked
+        set_checked = set_checked or File._set_checked_save
+        if vars_.DEBUG >= 1:
+            debug('%s?%s\n' % (depth, self.nicename()))
+
+        if self.failed_runid:
+            debug('%s-- DIRTY (failed last time)\n' % depth)
+            return DIRTY
+        if self.changed_runid is None:
+            debug('%s-- DIRTY (never built)\n' % depth)
+            return DIRTY
+        if self.changed_runid > max_changed:
+            debug('%s-- DIRTY (built)\n' % depth)
+            return DIRTY  # has been built more recently than parent
+        if is_checked(self):
+            if vars_.DEBUG >= 1:
+                debug('%s-- CLEAN (checked)\n' % depth)
+            return CLEAN  # has already been checked during this session
+        if not self.stamp:
+            debug('%s-- DIRTY (no stamp)\n' % depth)
+            return DIRTY
+
+        newstamp = self._read_stamp()
+        if self.stamp != newstamp:
+            if newstamp == STAMP_MISSING:
+                debug('%s-- DIRTY (missing)\n' % depth)
+            else:
+                debug('%s-- DIRTY (mtime)\n' % depth)
+            if self.csum:
+                return [self]
+            else:
+                return DIRTY
+
+        must_build = []
+        for mode, f2 in self._deps():
+            assert mode in ('c', 'm')
+            dirty = CLEAN
+            if mode == 'c':
+                if os.path.exists(os.path.join(vars_.BASE, f2.name)):
+                    debug('%s-- DIRTY (created)\n' % depth)
+                    dirty = DIRTY
+            elif mode == 'm':
+                sub = f2.is_dirty(max(self.changed_runid, self.checked_runid),
+                                 depth=depth + '  ',
+                                 is_checked=is_checked, set_checked=set_checked)
+                if sub:
+                    debug('%s-- DIRTY (sub)\n' % depth)
+                    dirty = sub
+
+            if not self.csum:
+                # self is a "normal" target:
+                # dirty f2 means self is instantly dirty
+                if dirty:
+                    # if dirty==DIRTY, this means self is definitely dirty.
+                    # if dirty==[...], it's a list of the uncertain children.
+                    return dirty
+            else:
+                # self is "checksummable": dirty f2 means self needs to redo,
+                # but self might turn out to be clean after that (ie. our
+                # parent might not be dirty).
+                if dirty == DIRTY:
+                    # f2 is definitely dirty, so self definitely needs to
+                    # redo.  However, after that, self might turn out to be
+                    # unchanged.
+                    return [self]
+
+                elif isinstance(dirty, list):
+                    # our child f2 might be dirty, but it's not sure yet.  It's
+                    # given us a list of targets we have to redo in order to
+                    # be sure.
+                    must_build.extend(dirty)
+
+        if must_build:
+            # self is *maybe* dirty because at least one of its children is
+            # maybe dirty.  must_build has accumulated a list of "topmost"
+            # uncertain objects in the tree.  If we build all those, we can then
+            # redo-ifchange self and it won't have any uncertainty next time.
+            return must_build
+
+        # if we get here, it's because the target is clean
+        if self.is_override:
+            warn_override(self.name)
+        set_checked(self)
+        return CLEAN
+
+    def fin(self):
+        self._refresh()
+        self.is_generated = True
+        self.is_override = False
+        if self._is_checked() or self._is_changed():
+            # it got checked during the run; someone ran redo-stamp.
+            # _update_stamp would call set_changed(); we don't want that
+            self.stamp = self._read_stamp()
+        else:
+            self.csum = None
+            self._update_stamp()
+            self.set_changed()
+        self._zap_deps2()
+        self.save()
+
+    def _refresh(self):
+        self._init_from_idname(self.id, None)
+
+    def _set_checked_save(self):
+        self.set_checked()
+        self.save()
+
+    def _set_override(self):
+        self._update_stamp()
+        self.is_override = True
+
+    def _update_stamp(self, must_exist=False):
+        newstamp = self._read_stamp()
+        if must_exist and newstamp == STAMP_MISSING:
+            raise Exception("%r does not exist" % self.name)
+        if newstamp != self.stamp:
+            debug2("STAMP: %s: %r -> %r\n" % (self.name, self.stamp, newstamp))
+            self.stamp = newstamp
+            self.set_changed()
+
+    def _is_checked(self):
+        return self.checked_runid and self.checked_runid >= vars_.RUNID
+
+    def _is_changed(self):
+        return self.changed_runid and self.changed_runid >= vars_.RUNID
+
+    def _read_stamp(self):
+        try:
+            st = os.stat(os.path.join(vars_.BASE, self.name))
+        except OSError:
+            return STAMP_MISSING
+        if stat.S_ISDIR(st.st_mode):
+            return STAMP_DIR
+        else:
+            # a "unique identifier" stamp for a regular file
+            return str((st.st_ctime, st.st_mtime, st.st_size, st.st_ino))
+
+
+# FIXME: I really want to use fcntl F_SETLK, F_SETLKW, etc here.  But python
+# doesn't do the lockdata structure in a portable way, so we have to use
+# fcntl.lockf() instead.  Usually this is just a wrapper for fcntl, so it's
+# ok, but it doesn't have F_GETLK, so we can't report which pid owns the lock.
+# The makes debugging a bit harder.  When we someday port to C, we can do that.
+_locks = {}
+class Lock:
+    def __init__(self, fid):
+        self.owned = False
+        self.fid = fid
+        self.lockfile = os.open(os.path.join(vars_.BASE, '.redo/lock.%d' % fid),
+                                os.O_RDWR | os.O_CREAT, 0666)
+        close_on_exec(self.lockfile, True)
+        assert _locks.get(fid, 0) == 0
+        _locks[fid] = 1
+
+    def __del__(self):
+        _locks[self.fid] = 0
+        if self.owned:
+            self.unlock()
+        os.close(self.lockfile)
+
+    def trylock(self):
+        assert not self.owned
+        try:
+            fcntl.lockf(self.lockfile, fcntl.LOCK_EX|fcntl.LOCK_NB, 0, 0)
+        except IOError, e:
+            if e.errno in (errno.EAGAIN, errno.EACCES):
+                pass  # someone else has it locked
+            else:
+                raise
+        else:
+            self.owned = True
+
+    def waitlock(self):
+        assert not self.owned
+        fcntl.lockf(self.lockfile, fcntl.LOCK_EX, 0, 0)
+        self.owned = True
+
+    def unlock(self):
+        if not self.owned:
+            raise Exception("can't unlock %r - we don't own it" 
+                            % self.lockname)
+        fcntl.lockf(self.lockfile, fcntl.LOCK_UN, 0, 0)
+        self.owned = False
+
+
+def main(bc, targets, shouldbuildfunc):
     retcode = [0]  # a list so that it can be reassigned from done()
     if vars_.SHUFFLE:
         import random
@@ -275,16 +571,16 @@ def main(targets, shouldbuildfunc):
             continue
         seen[t] = 1
         if not jwack.has_token():
-            state.commit()
+            bc.commit()
         jwack.get_token(t)
         if retcode[0] and not vars_.KEEP_GOING:
             break
-        if not state.check_sane():
+        if not bc.check_sane():
             err('.redo directory disappeared; cannot continue.\n')
             retcode[0] = 205
             break
-        f = state.File(name=t)
-        lock = state.Lock(f.id)
+        f = bc.file_from_name(t)
+        lock = Lock(f.id)
         if vars_.UNLOCKED:
             lock.owned = True
         else:
@@ -306,19 +602,19 @@ def main(targets, shouldbuildfunc):
     # of redo-ifchange; then we have to redo it even if someone else already
     # did.  But that should be rare.
     while locked or jwack.running():
-        state.commit()
+        bc.commit()
         jwack.wait_all()
         # at this point, we don't have any children holding any tokens, so
         # it's okay to block below.
         if retcode[0] and not vars_.KEEP_GOING:
             break
         if locked:
-            if not state.check_sane():
+            if not bc.check_sane():
                 err('.redo directory disappeared; cannot continue.\n')
                 retcode[0] = 205
                 break
             fid,t = locked.pop(0)
-            lock = state.Lock(fid)
+            lock = Lock(fid)
             lock.trylock()
             while not lock.owned:
                 if vars_.DEBUG_LOCKS:
@@ -335,12 +631,12 @@ def main(targets, shouldbuildfunc):
             assert lock.owned
             if vars_.DEBUG_LOCKS:
                 log('%s (...unlocked!)\n' % _nice(t))
-            if state.File(name=t).is_failed():
+            if bc.file_from_name(t).is_failed():
                 err('%s: failed in another thread\n' % _nice(t))
                 retcode[0] = 2
                 lock.unlock()
             else:
-                BuildJob(state.File(id=fid), lock,
+                BuildJob(bc.file_from_id(fid), lock,
                          shouldbuildfunc, done).start()
-    state.commit()
+    bc.commit()
     return retcode[0]
