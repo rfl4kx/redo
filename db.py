@@ -1,5 +1,12 @@
 import sys, os, errno, glob, stat, fcntl, sqlite3
-from helpers import unlink, close_on_exec, join, try_stat, possible_do_files
+from helpers import (
+    close_on_exec,
+    join,
+    possible_do_files,
+    relpath,
+    try_stat,
+    unlink,
+    )
 from log import log, warn, err, debug, debug2, debug3
 
 SCHEMA_VER = 1
@@ -108,24 +115,6 @@ def check_sane(BASE):
     if not _insane:
         _insane = not os.path.exists('%s/.redo' % (BASE,))
     return not _insane
-
-
-_cwd = None
-def relpath(t, base):
-    global _cwd
-    if not _cwd:
-        _cwd = os.getcwd()
-    t = os.path.normpath(os.path.join(_cwd, t))
-    base = os.path.normpath(base)
-    tparts = t.split('/')
-    bparts = base.split('/')
-    for tp, bp in zip(tparts, bparts):
-        if tp != bp:
-            break
-        tparts.pop(0)
-        bparts.pop(0)
-    tparts = ['..'] * len(bparts) + tparts
-    return tparts and os.path.join(*tparts) or ''
 
 
 _file_cols = ['rowid', 'name', 'is_generated', 'is_override',

@@ -11,7 +11,7 @@ from os.path import (
 import db
 from builder import File
 from log import warn
-from helpers import atoi
+from helpers import atoi, relpath
 
 
 def toplevel(env):
@@ -95,7 +95,6 @@ class BuildContext(object):
         db.db(self) # RUNID & REDO_RUNID are set in this call if they
                     # were previously None/undefined.
         assert self.RUNID, repr(self.RUNID)
-        self.relpath = db.relpath
         self.DEPTH = self.env.get('REDO_DEPTH', '')
         self.DEBUG = atoi(self.env.get('REDO_DEBUG', ''))
         self.DEBUG_LOCKS = self.env.get('REDO_DEBUG_LOCKS', '') and 1 or 0
@@ -156,7 +155,7 @@ class BuildContext(object):
         self.env['REDO_DEPTH'] = self.DEPTH + '  '
 
     def set_subprocess_context(self, newp, target):
-        self.env['REDO_PWD'] = self.relpath(realpath(newp), self.STARTDIR)
+        self.env['REDO_PWD'] = relpath(realpath(newp), self.STARTDIR)
         self.env['REDO_TARGET'] = target
 
 

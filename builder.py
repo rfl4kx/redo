@@ -1,8 +1,15 @@
 import sys, os, errno, stat, fcntl
 import jwack
-from helpers import unlink, close_on_exec, join, try_stat, possible_do_files
+from helpers import (
+    close_on_exec,
+    join,
+    possible_do_files,
+    relpath,
+    try_stat,
+    unlink,
+    )
 from log import log, log_, debug, debug2, debug3, err, warn
-from db import FileDBMixin, relpath, ALWAYS
+from db import FileDBMixin, ALWAYS
 
 
 STAMP_DIR='dir'     # the stamp of a directory; mtime is unhelpful
@@ -49,7 +56,7 @@ class BuildJob:
         except ImmediateReturn, e:
             return self._report_results_and_unlock(e.rv)
 
-        if self.bc.NO_OOB or dirty == True:
+        if self.bc.NO_OOB or isinstance(dirty, (bool, int)) and dirty:
             self._start_do()
         else:
             self._start_unlocked(dirty)
@@ -144,7 +151,7 @@ class BuildJob:
                 arg1,
                 arg2,
                 # temp output file name
-                self.bc.relpath(os.path.abspath(self.tmpname2), dodir),
+                relpath(os.path.abspath(self.tmpname2), dodir),
                 ]
 
         if self.bc.VERBOSE:
@@ -303,6 +310,22 @@ class File(FileDBMixin, object):
         self.is_override = False
         self.is_generated = False
 
+    def set_csum(self, csum):
+        changed = (csum != self.csum)
+        debug2('%s: old = %s\n' % (self.name, self.csum))
+        debug2('%s: sum = %s (%s)\n' % (self.name, csum,
+                                        ('unchanged', 'changed')[changed]))
+        self.is_generated = True
+        self.is_override = False
+        self.failed_runid = None
+        if changed:
+            self.set_changed() # update_stamp might not do this
+                               # if the mtime is identical
+            self.csum = csum
+        else:
+            # unchanged
+            self.set_checked()
+
     def is_failed(self):
         return self.failed_runid and self.failed_runid >= self.bc.RUNID
 
@@ -310,8 +333,7 @@ class File(FileDBMixin, object):
         return self._read_stamp() != STAMP_MISSING
 
     def nicename(self):
-        return self.bc.relpath(os.path.join(self.bc.BASE, self.name),
-                               self.bc.STARTDIR)
+        return relpath(os.path.join(self.bc.BASE, self.name), self.bc.STARTDIR)
 
     def special(self):
         return self.name.startswith('//')
@@ -635,3 +657,4 @@ def main(bc, targets, shouldbuildfunc):
                          shouldbuildfunc, done).start()
     bc.commit()
     return retcode[0]
+

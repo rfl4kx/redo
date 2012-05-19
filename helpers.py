@@ -16,13 +16,14 @@ def unlink(f):
     """Delete a file at path 'f' if it currently exists.
 
     Unlike os.unlink(), does not throw an exception if the file didn't already
-    exist.
+    exist or if it is actually a directory.
     """
     try:
         os.unlink(f)
     except OSError, e:
-        if e.errno == errno.ENOENT:
-            pass  # it doesn't exist, that's what you asked for
+        if e.errno not in (errno.ENOENT, errno.EISDIR):
+            raise
+        # else: it doesn't exist, that's what you asked for
 
 
 def unique(N, in_order=False):
@@ -80,4 +81,22 @@ def default_do_files(filename):
         if ext:
             ext = '.' + ext
         yield ("default%s.do" % ext), basename, ext
+
+
+_cwd = None
+def relpath(t, base):
+    global _cwd
+    if not _cwd:
+        _cwd = os.getcwd()
+    t = os.path.normpath(os.path.join(_cwd, t))
+    base = os.path.normpath(base)
+    tparts = t.split('/')
+    bparts = base.split('/')
+    for tp, bp in zip(tparts, bparts):
+        if tp != bp:
+            break
+        tparts.pop(0)
+        bparts.pop(0)
+    tparts = ['..'] * len(bparts) + tparts
+    return tparts and os.path.join(*tparts) or ''
 
