@@ -100,8 +100,11 @@ def build(target_name):
             target.forget()
             return 0  # no longer a generated target, but exists, so ok
 
+    tmpdirname = target.tmpfilename('redodir.tmp')
+    os.mkdir(tmpdirname)
+
     tmpname1 = target.tmpfilename('redo1.tmp')  # name connected to stdout
-    tmpname2 = target.tmpfilename('redo2.tmp')  # name provided as $3
+    tmpname2 = os.path.join(tmpdirname, target.basename())  # name provided as $3
     unlink(tmpname1)
     unlink(tmpname2)
     tmp1_fd = os.open(tmpname1, os.O_CREAT|os.O_RDWR|os.O_EXCL, 0666)
@@ -176,10 +179,10 @@ def build(target_name):
         err('...you should write status messages to stderr, not stdout.\n')
         rv = 207
     if rv==0:
-        if st2:
+        if st2: # tmpname2 has been created
             os.rename(tmpname2, target.name)
             os.unlink(tmpname1)
-        elif st1.st_size > 0:
+        elif st1.st_size > 0: # tmpname1 has been updated (script stdout)
             try:
                 os.rename(tmpname1, target.name)
             except OSError, e:
@@ -190,6 +193,14 @@ def build(target_name):
         else: # no output generated at all; that's ok
             unlink(tmpname1)
             unlink(target.name)
+        
+        # For all files in the temp directory, copy them in the dodir
+        for f in os.listdir(tmpdirname):
+            pass
+            # TODO: copy in the dodir
+            # mark the file as depending on target
+            # redo-ifchange the file to make sure it is up to date
+
         if vars.VERBOSE or vars.XTRACE or vars.DEBUG:
             log('%s (done)\n\n', target.printable_name())
     else:

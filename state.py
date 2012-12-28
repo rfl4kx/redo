@@ -85,6 +85,9 @@ class File(object):
     def tmpfilename(self, filetype):
         return '%s.%s.redo' % (self._file_prefix or self.name, filetype)
 
+    def basename(self):
+        return os.path.basename(self.name)
+
     def printable_name(self):
         """Return the name relative to vars.STARTDIR, normalized.
 
