@@ -196,10 +196,15 @@ def build(target_name):
         
         # For all files in the temp directory, copy them in the dodir
         for f in os.listdir(tmpdirname):
-            pass
-            # TODO: copy in the dodir
+            # copy in the dodir
+            dest = os.path.join(dodir, f)
+            os.rename(os.path.join(tmpdirname, f), dest)
             # mark the file as depending on target
+            sf = state.File(name=dest)
+            sf.add_dep(target)
+            sf.build_done(exitcode=rv)
             # redo-ifchange the file to make sure it is up to date
+            
 
         if vars.VERBOSE or vars.XTRACE or vars.DEBUG:
             log('%s (done)\n\n', target.printable_name())
