@@ -23,6 +23,14 @@ def warn_override(name):
     warn('%s - you modified it; skipping\n', name)
 
 
+def fix_chdir_single(target):
+    abs_pwd = os.path.join(vars.STARTDIR, vars.PWD)
+    if os.path.samefile('.', abs_pwd):
+        return target  # nothing to change
+    rel_orig_dir = os.path.relpath('.', abs_pwd)
+    os.chdir(abs_pwd)
+    return os.path.join(rel_orig_dir, ttarget)
+
 def fix_chdir(targets):
     """Undo any chdir() done by the .do script that called us.
 

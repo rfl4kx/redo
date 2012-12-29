@@ -47,6 +47,13 @@ KEEP_GOING = os.environ.get('REDO_KEEP_GOING', '') and 1 or 0
 # The value of the --shuffle flag.
 SHUFFLE = os.environ.get('REDO_SHUFFLE', '') and 1 or 0
 
+# The value of the --overwrite flag.
+OVERWRITE = os.environ.get('REDO_OVERWRITE', '') and 1 or 0
+
+# Environment variables to forward
+ENVIRONMENT = (os.environ.get('REDO_ENVIRONMENT', '').split(',') +
+  ['REDO_DEPTH', 'REDO_TARGET', 'REDO_PWD'])
+
 # The id of the current redo execution; an int(time.time()) value.
 RUNID_FILE = os.environ.get('REDO_RUNID_FILE')
 RUNID = runid.read(os.path.join(STARTDIR, RUNID_FILE))
