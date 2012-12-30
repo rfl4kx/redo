@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import os, sys, shutil
+import os, sys, shutil, signal
 
 BINARIES = ["redo", "redo-ifchange", "redo-ifcreate"]
 
@@ -9,7 +9,7 @@ if not os.environ.get('REDO_STARTDIR'):
     import runid
     runid.change('runid.redo')
 
-if 'REDO_DIR' not in os.environ:
+if not os.environ.get('REDO_DIR'):
     from tempfile import mkdtemp
     tmpdir = mkdtemp()
     bindir = os.path.join(tmpdir, "bin")
@@ -77,15 +77,17 @@ try:
         sys.exit(server.run_client())
     else:
         srv = server.Peer()
-        srv.bind()
+        srv.bind().listen()
         pid = os.fork()
         if pid == 0:  # child
-            srv.close()
-            sys.exit(server.run_client(targets))
-        else: # parent
             server.run_server(srv, pid, j)
-            shutil.rmtree(os.environ['REDO_DIR'])
+            shutil.rmtree(os.getenv('REDO_DIR'))
             sys.exit(srv.exit_status or srv.child_status[pid])
+        else: # parent
+            srv.close()
+            res = server.run_client(targets)
+            os.kill(pid, signal.SIGTERM)
+            sys.exit(res)
 
 except KeyboardInterrupt:
     sys.exit(200)

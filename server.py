@@ -3,7 +3,7 @@ import vars, main
 import socket, sys, os, signal, errno
 
 def socketfile():
-  return os.path.join(os.environ['REDO_DIR'], "socket")
+  return os.path.join(os.getenv('REDO_DIR'), "socket")
 
 def has_server():
   return os.path.exists(socketfile())
@@ -17,26 +17,17 @@ def run_server_instance(server, client, jobs):
     if buf == "END":
       return
     elif var == "RUN":
-      debug3("Run %s %s\n", exe, arg)
       pid = os.fork()
       if pid == 0: # child
-        for e in env:
+        for k in env:
           try:
-            if env[e] == None: del os.environ[e]
-            else:              os.environ[e] = env[e]
+            if env[k] == None: del os.environ[k]
+            else:              os.environ[k] = env[k]
           except: pass
+        debug3("Run %s %s\n", exe, arg)
         res = main.run_main(exe, arg)
         client.send("EXIT=%s=%d" % (val, res))
         sys.exit(res)
-      else:
-        server.add_child_pid(pid)
-        #if len(server.child_pids) > jobs:
-        #  try:
-        #    pid, exit = os.waitpid(pid, 0)
-        #    server._register_child_status(pid, exit)
-        #  except OSError as e:
-        #    if e.errno != errno.ECHILD: raise
-        
     elif var == "X":
       exe = val
     elif var == "ARG":
@@ -47,19 +38,11 @@ def run_server_instance(server, client, jobs):
       else:  env[var] = None
 
 def run_server(server, child_pid, jobs):
-  with server.listen() as srv:
+  with server as srv:
     if child_pid: srv.add_child_pid(child_pid)
     debug3("Server accept connections\n")
     for client in srv.accept():
       with client as c:
-        #pid = os.fork()
-        #if pid == 0: # child
-        #  debug3("Server child process\n")
-        #  run_server_instance(c)
-        #  debug3("Server child process exit\n")
-        #  sys.exit(0)
-        #else: # parent
-        #  srv.add_child_pid(pid)
         run_server_instance(server, c, jobs)
 
 def run_client(targets = sys.argv[1:]):
@@ -74,10 +57,10 @@ def run_client(targets = sys.argv[1:]):
     conn.send("X=%s" % os.path.basename(sys.argv[0]))
     i = 1
     for env in vars.ENVIRONMENT:
-      if env in os.environ:
-        conn.send("ENV=%s=%s" % (env, os.environ[env]))
-      else:
+      if os.getenv(env) == None:
         conn.send("ENV=%s" % env)
+      else:
+        conn.send("ENV=%s=%s" % (env, os.getenv(env)))
     for arg in targets:
       conn.send("ARG=%s" % os.path.abspath(arg))
       conn.send("RUN=%d" % i)
@@ -105,9 +88,6 @@ class Peer:
       self.sock = sock
     else:
       self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    self.child_pids = []
-    self.child_status = {}
-    self.exit_status = 0
   
   def bind(self, listen_queue=1):
     self.sock.bind(self.sockfile)
@@ -130,55 +110,26 @@ class Peer:
   def close(self):
     self.sock.close()
     
-  def _receive_sigchld(self, x, y):
-    try:
-      pid, exit = os.waitpid(0, os.WNOHANG)
-      debug3("Received SIGCHLD for %d (exit status: %d)\n", pid, exit)
-    except OSError as e:
-      if e.errno != errno.ECHILD: raise
-  
-  def _register_child_status(self, pid, exit):
-    debug3("Received SIGCHLD for %d (exit status: %d)\n", pid, exit)
-    self.child_status[pid] = exit
-    if pid in self.child_pids:
-      self.child_pids.remove(pid)
-      if exit and not vars.KEEP_GOING: self.exit_status = 1
-  
   def accept(self):
-    signal.signal(signal.SIGCHLD, self._receive_sigchld)
-    signal.siginterrupt(signal.SIGCHLD, True)
+    signal.siginterrupt(signal.SIGTERM, True)
     while True:
       try:
-        # Be careful, there might be a race to accept() in Python runtime
-        # - the python accept function is executed
-        # - this locks signal handlers until the end of the C function
-        # - before the accept() syscall is executed, a child dies
-        # - the SIGCHLD handler is blocked by the Python lock with no chance
-        #   of recovering
         conn, addr = self.sock.accept()
         yield Peer(sockfile=self.sockfile, sock=conn)
       except IOError as e:
         if e.errno != errno.EINTR: raise
-        if len(self.child_pids) == 0: break
-        if self.exit_status: break
+        else:                      break
   
   def send(self, payload):
     debug3("send %s\n", payload)
     self.sock.send("%08x%s" % (len(payload), payload))
-  
-  def _recv(self, len):
-    while True:
-      try:
-        return self.sock.recv(len)
-      except IOError as e:
-        if e.errno != errno.EINTR: raise      
-  
+
   def recv(self):
-    length = self._recv(8)
+    length = self.sock.recv(8)
     if length == "":
       return None
     length = int(length, base=16)
-    payload = self._recv(length)
+    payload = self.sock.recv(length)
     debug3("receive %s\n", payload)
     return payload
   
@@ -187,11 +138,4 @@ class Peer:
       payload = self.recv()
       if payload: yield payload
       else:       break
-  
-  def add_child_pid(self, pid):
-    if pid not in self.child_status:
-      self.child_pids.append(pid)
-    elif self.child_status[pid] and not vars.KEEP_GOING:
-      self.exit_status = 1
-
 
