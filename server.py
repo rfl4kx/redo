@@ -12,6 +12,8 @@ def run_server_instance(server, client, jobs):
   exe = "redo"
   arg = None
   env = {}
+  csum_in = None
+  keep_going = vars.KEEP_GOING
   for buf in client.recvloop():
     var, eq, val = buf.partition("=")
     if buf == "END":
@@ -24,18 +26,29 @@ def run_server_instance(server, client, jobs):
             if env[k] == None: del os.environ[k]
             else:              os.environ[k] = env[k]
           except: pass
+        reload(vars)
         debug3("Run %s %s\n", exe, arg)
-        res = main.run_main(exe, arg)
+        res = main.run_main(exe, arg, csum_in)
         client.send("EXIT=%s=%d" % (val, res))
         sys.exit(res)
+      else:
+        pid2, status = os.waitpid(pid, 0)
+        if pid2 == pid and status != 0 and not keep_going:
+          client.send("END")
+          return
     elif var == "X":
       exe = val
     elif var == "ARG":
       arg = val
     elif var == "ENV":
       var, eq, val = val.partition("=")
-      if eq: env[var] = val
-      else:  env[var] = None
+      if not eq: env[var] = None
+      else:
+        env[var] = val
+        if var == "REDO_KEEP_GOING":
+          keep_going = int(val)
+    elif var == "CSUMIN":
+      csum_in = val
 
 def run_server(server, child_pid, jobs):
   with server as srv:
@@ -43,40 +56,80 @@ def run_server(server, child_pid, jobs):
     debug3("Server accept connections\n")
     for client in srv.accept():
       with client as c:
-        run_server_instance(server, c, jobs)
+        pid = os.fork()
+        if pid == 0:
+          run_server_instance(server, c, jobs)
 
 def run_client(targets = sys.argv[1:]):
-  debug3("Client\n")
-  if len(sys.argv[1:]) == 0: return
-  if len(targets) == 0:
-    targets.append('all')
-  if vars.SHUFFLE:
-    import random
-    random.shuffle(targets)
-  with Peer().client() as conn:
-    conn.send("X=%s" % os.path.basename(sys.argv[0]))
-    i = 1
-    for env in vars.ENVIRONMENT:
-      if os.getenv(env) == None:
-        conn.send("ENV=%s" % env)
-      else:
-        conn.send("ENV=%s=%s" % (env, os.getenv(env)))
-    for arg in targets:
-      conn.send("ARG=%s" % os.path.abspath(arg))
-      conn.send("RUN=%d" % i)
-      i = i + 1
-    conn.send("END")
-    res = 0
-    for buf in conn.recvloop():
-      var, eq, val = buf.partition("=")
-      if var == "EXIT":
-        var, eq, val = val.partition("=")
-        val = int(val)
-        if val != 0:
-          if i == 2: res = val
-          else:      res = 1  
-  debug3("Client exit %d\n", res)
-  return res
+    debug3("Client\n")
+    exe = os.path.basename(sys.argv[0])
+    return_values = []
+
+    if exe == "redo-stamp":
+        if len(targets) > 1:
+            err('%s: no arguments expected.\n', exe)
+            return 1
+
+        if os.isatty(0):
+            err('%s: you must provide the data to stamp on stdin\n', exe)
+            return 1
+
+        try:
+            import hashlib
+        except ImportError:
+            import sha
+            sh = sha.sha()
+        else:
+            sh = hashlib.sha1()
+    elif len(targets) == 0:
+        targets.append('all')
+
+    if vars.SHUFFLE:
+        import random
+        random.shuffle(targets)
+
+    with Peer().client() as conn:
+        conn.send("X=%s" % exe)
+        conn.send("KEEP_GOING=%d" % vars.KEEP_GOING)
+
+        for env in vars.ENVIRONMENT:
+            if os.getenv(env) == None:
+                conn.send("ENV=%s" % env)
+            else:
+                conn.send("ENV=%s=%s" % (env, os.getenv(env)))
+
+        if exe == "redo-stamp":
+            while True:
+                b = os.read(0, 4096)
+                sh.update(b)
+                if not b: break
+            conn.send("CSUMIN=%s" % sh.hexdigest())
+            conn.send("RUN=1")
+            conn.send("END")
+        else:
+            i = 1
+            for arg in targets:
+                conn.send("ARG=%s" % os.path.abspath(arg))
+                conn.send("RUN=%d" % i)
+                i = i + 1
+            conn.send("END")
+
+        for buf in conn.recvloop():
+            var, eq, val = buf.partition("=")
+            if var == "EXIT":
+                var, eq, val = val.partition("=")
+                val = int(val)
+                return_values.append(val)
+
+    if len(return_values) == 1:
+        res = return_values[0]
+    elif len([i for i in return_values if i != 0]) > 0:
+        res = 1
+    else:
+        res = 0
+
+    debug3("Client exit %d\n", res)
+    return res
 
 class Peer:
   def __init__(self, sockfile=None, sock=None):
@@ -125,13 +178,15 @@ class Peer:
     self.sock.send("%08x%s" % (len(payload), payload))
 
   def recv(self):
-    length = self.sock.recv(8)
-    if length == "":
-      return None
-    length = int(length, base=16)
-    payload = self.sock.recv(length)
-    debug3("receive %s\n", payload)
-    return payload
+    try:
+        length = self.sock.recv(8)
+        if length == "": return None
+        length = int(length, base=16)
+        payload = self.sock.recv(length)
+        debug3("receive %s\n", payload)
+        return payload
+    except:
+        return None
   
   def recvloop(self):
     while True:
