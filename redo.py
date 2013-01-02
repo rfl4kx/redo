@@ -15,6 +15,7 @@ shuffle    randomize the build order to find dependency bugs
 debug-locks  print messages about file locking (useful for debugging)
 debug-pids   print process ids as part of log messages (useful for debugging)
 version    print the current version and exit
+overwrite  overwrite files even if generated outside of redo
 old-args   use old-style definitions of $1,$2,$3 (deprecated)
 """
 o = options.Options(optspec)
@@ -40,6 +41,8 @@ if opt.debug_locks:
     os.environ['REDO_DEBUG_LOCKS'] = '1'
 if opt.debug_pids:
     os.environ['REDO_DEBUG_PIDS'] = '1'
+if opt.overwrite:
+    os.environ['REDO_OVERWRITE'] = '1'
 if opt.old_args:
     os.environ['REDO_OLD_ARGS'] = '1'
 

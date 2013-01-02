@@ -147,8 +147,21 @@ def relpath(t, base):
     return join('/', tparts)
 
 
-def warn_override(name):
-    warn('%s - you modified it; skipping\n' % name)
+def warn_override(name, overwrite):
+    if overwrite:
+        warn('%s: you modified it; overwrite\n' % name)
+    else:
+        warn('%s: you modified it; skipping\n' % name)
+
+
+def warn_override_clean(name):
+    warn('%s: you modified it; skipping because it is up to date\n' % name)
+
+def warn_existing(name, overwrite):
+    if overwrite:
+        warn('%s: exists and not marked as generated; overwrite\n' % name)
+    else:
+        warn('%s: exists and not marked as generated; not redoing\n' % name)
 
 
 _file_cols = ['rowid', 'name', 'is_generated', 'is_override',

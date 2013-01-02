@@ -17,6 +17,7 @@ OLD_ARGS = os.environ.get('REDO_OLD_ARGS', '') and 1 or 0
 VERBOSE = os.environ.get('REDO_VERBOSE', '') and 1 or 0
 XTRACE = os.environ.get('REDO_XTRACE', '') and 1 or 0
 KEEP_GOING = os.environ.get('REDO_KEEP_GOING', '') and 1 or 0
+OVERWRITE = os.environ.get('REDO_OVERWRITE', '') and 1 or 0
 SHUFFLE = os.environ.get('REDO_SHUFFLE', '') and 1 or 0
 STARTDIR = os.environ.get('REDO_STARTDIR', '')
 RUNID = atoi(os.environ.get('REDO_RUNID')) or None

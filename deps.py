@@ -86,7 +86,7 @@ def isdirty(f, depth, max_changed,
 
     # if we get here, it's because the target is clean
     if f.is_override:
-        state.warn_override(f.name)
+        state.warn_override_clean(f.name)
     set_checked(f)
     return CLEAN
 
