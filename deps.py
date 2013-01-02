@@ -8,6 +8,9 @@ DIRTY = 1
 def isdirty(f, depth, max_changed,
             is_checked=state.File.is_checked,
             set_checked=state.File.set_checked_save):
+    """
+    Return either CLEAN, DIRTY or a list of files that must be built to decide
+    """
     if vars.DEBUG >= 1:
         debug('%s?%s\n' % (depth, f.nicename()))
 
