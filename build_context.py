@@ -106,6 +106,7 @@ class BuildContext(object):
         self.SHUFFLE = self.env.get('REDO_SHUFFLE', '') and 1 or 0
         self.STARTDIR = self.env.get('REDO_STARTDIR', '')
         self.UNLOCKED = self.env.get('REDO_UNLOCKED', '') and 1 or 0
+        self.OVERWRITE = self.env.get('REDO_OVERWRITE', '') and 1 or 0
         self.env['REDO_UNLOCKED'] = ''  # not inheritable by subprocesses
         self.NO_OOB = self.env.get('REDO_NO_OOB', '') and 1 or 0
         self.env['REDO_NO_OOB'] = ''    # not inheritable by subprocesses
@@ -142,14 +143,6 @@ class BuildContext(object):
 
     def commit(self):
         db.commit(self)
-
-    def warn_about_existing_ungenerated(self, targets):
-        for t in targets:
-            if exists(t):
-                f = self.file_from_name(t)
-                if not f.is_generated:
-                    warn('%s: exists and not marked as generated; not redoing.\n'
-                         % f.nicename())
 
     def incr_DEPTH(self):
         self.env['REDO_DEPTH'] = self.DEPTH + '  '
