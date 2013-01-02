@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import os, sys, shutil, signal
 
-BINARIES = ["redo", "redo-ifchange", "redo-ifcreate"]
+BINARIES = ["redo", "redo-ifchange", "redo-ifcreate", "redo-always", "redo-stamp"]
 
 if not os.environ.get('REDO_STARTDIR'):
     os.environ['REDO_STARTDIR'] = os.getcwd()
@@ -74,7 +74,7 @@ try:
         err('invalid --jobs value: %r\n', opt.jobs)
 
     if server.has_server():
-        sys.exit(server.run_client())
+        sys.exit(server.run_client(targets))
     else:
         srv = server.Peer()
         srv.bind().listen()

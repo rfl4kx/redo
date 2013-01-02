@@ -52,7 +52,9 @@ OVERWRITE = os.environ.get('REDO_OVERWRITE', '') and 1 or 0
 
 # Environment variables to forward
 ENVIRONMENT = (os.environ.get('REDO_ENVIRONMENT', '').split(',') +
-  ['REDO_DEPTH', 'REDO_TARGET', 'REDO_PWD'])
+  ['REDO_DEPTH', 'REDO_TARGET', 'REDO_PWD', 'REDO_DEBUG', 'REDO_DEBUG_PIDS',
+   'REDO_OLD_ARGS', 'REDO_VERBOSE', 'REDO_XTRACE', 'REDO_KEEP_GOING',
+   'REDO_SHUFFLE', 'REDO_OVERWRITE', 'REDO_ENVIRONMENT'])
 
 # The id of the current redo execution; an int(time.time()) value.
 RUNID_FILE = os.environ.get('REDO_RUNID_FILE')

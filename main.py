@@ -75,11 +75,28 @@ def redo_ifcreate(f):
         st.add_dep(state.File(name=f))
         return 0
 
-def run_main(exe, arg):
+def redo_always(f):
+    "f: absolute target pathname"
+    f = state.File(vars.TARGET)
+    f.add_dep(state.File(name=state.ALWAYS))
+    return 0
+
+def redo_stamp(csum):
+    "csum: checksum of the input"
+    if not vars.TARGET: return 0
+    f = state.File(vars.TARGET)
+    f._add('%s .' % csum)
+    return 0
+
+def run_main(exe, arg, csum_in):
     if exe == "redo-ifchange":
         return redo_ifchange(arg)
     if exe == "redo-ifcreate":
         return redo_ifcreate(arg)
+    if exe == "redo-always":
+        return redo_always(arg)
+    if exe == "redo-stamp":
+        return redo_stamp(csum_in)
     else:
         return redo(arg)
 
