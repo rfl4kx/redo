@@ -1,4 +1,4 @@
-import sys, os, errno, glob, stat, fcntl, sqlite3
+import sys, os, errno, glob, stat, lockfile, sqlite3
 import vars
 from helpers import unlink, close_on_exec, join
 from log import warn, err, debug2, debug3
@@ -311,6 +311,9 @@ class File(object):
     def nicename(self):
         return relpath(os.path.join(vars.BASE, self.name), vars.STARTDIR)
 
+    def path(self):
+        return os.path.join(vars.BASE, self.name)
+
 
 def files():
     q = ('select %s from Files order by name' % join(', ', _file_cols))
@@ -323,43 +326,33 @@ def files():
 # fcntl.lockf() instead.  Usually this is just a wrapper for fcntl, so it's
 # ok, but it doesn't have F_GETLK, so we can't report which pid owns the lock.
 # The makes debugging a bit harder.  When we someday port to C, we can do that.
-_locks = {}
 class Lock:
-    def __init__(self, fid):
+    def __init__(self, path):
         self.owned = False
-        self.fid = fid
-        self.lockfile = os.open(os.path.join(vars.BASE, '.redo/lock.%d' % fid),
-                                os.O_RDWR | os.O_CREAT, 0666)
-        close_on_exec(self.lockfile, True)
-        assert(_locks.get(fid,0) == 0)
-        _locks[fid] = 1
+        self.path = path
+        self.lock = lockfile.FileLock(path)
 
     def __del__(self):
-        _locks[self.fid] = 0
         if self.owned:
             self.unlock()
-        os.close(self.lockfile)
 
     def trylock(self):
         assert(not self.owned)
         try:
-            fcntl.lockf(self.lockfile, fcntl.LOCK_EX|fcntl.LOCK_NB, 0, 0)
-        except IOError, e:
-            if e.errno in (errno.EAGAIN, errno.EACCES):
-                pass  # someone else has it locked
-            else:
-                raise
+            self.lock.acquire(timeout=0)
+        except lockfile.AlreadyLocked:
+            pass
         else:
             self.owned = True
 
     def waitlock(self):
         assert(not self.owned)
-        fcntl.lockf(self.lockfile, fcntl.LOCK_EX, 0, 0)
+        self.lock.acquire()
         self.owned = True
             
     def unlock(self):
         if not self.owned:
             raise Exception("can't unlock %r - we don't own it" 
                             % self.lockname)
-        fcntl.lockf(self.lockfile, fcntl.LOCK_UN, 0, 0)
+        self.lock.release()
         self.owned = False

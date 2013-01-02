@@ -331,7 +331,7 @@ def main(targets, shouldbuildfunc):
             retcode[0] = 205
             break
         f = state.File(name=t)
-        lock = state.Lock(f.id)
+        lock = state.Lock(f.path())
         if vars.UNLOCKED:
             lock.owned = True
         else:
@@ -339,7 +339,7 @@ def main(targets, shouldbuildfunc):
         if not lock.owned:
             if vars.DEBUG_LOCKS:
                 log('%s (locked...)\n' % _nice(t))
-            locked.append((f.id,t))
+            locked.append((f.path(), t))
         else:
             BuildJob(t, f, lock, shouldbuildfunc, done).start()
 
@@ -364,8 +364,8 @@ def main(targets, shouldbuildfunc):
                 err('.redo directory disappeared; cannot continue.\n')
                 retcode[0] = 205
                 break
-            fid,t = locked.pop(0)
-            lock = state.Lock(fid)
+            fpath, t = locked.pop(0)
+            lock = state.Lock(fpath, fid)
             lock.trylock()
             while not lock.owned:
                 if vars.DEBUG_LOCKS:
