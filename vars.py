@@ -1,6 +1,10 @@
 import os
 from atoi import atoi
 
+def reload_vars():
+    from sys import modules
+    reload(modules[__name__])
+
 if not os.environ.get('REDO'):
     import sys
     sys.stderr.write('%s: error: must be run from inside a .do\n'
