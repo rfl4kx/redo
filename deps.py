@@ -5,29 +5,37 @@ from log import debug
 CLEAN = 0
 DIRTY = 1
 
-def isdirty(f, depth, max_changed,
-            is_checked=state.File.is_checked,
-            set_checked=state.File.set_checked_save):
+def isdirty(f, depth, max_changed):
     """
     Return either CLEAN, DIRTY or a list of files that must be built to decide
+
+    f:           the dependency to check
+    depth:       depth indentation
+    max_changed: runid when the target has been changed or checked (needed to
+                 know if the dependency is more recent than its target)
+                 TODO: make this a File instead of a runid
     """
     if vars.DEBUG >= 1:
         debug('%s?%s\n' % (depth, f.nicename()))
 
-    if f.failed_runid:
+    if f.has_failed():
         debug('%s-- DIRTY (failed last time)\n' % depth)
         return DIRTY
     if f.changed_runid == None:
         debug('%s-- DIRTY (never built)\n' % depth)
         return DIRTY
-    if f.changed_runid > max_changed:
+    if f.is_out_of_date(max_changed):
         debug('%s-- DIRTY (built)\n' % depth)
         return DIRTY  # has been built more recently than parent
-    if is_checked(f):
+    if f.is_checked():
+        # This is probably an optimization and might be thrown away at the cost
+        # of performance
         if vars.DEBUG >= 1:
-            debug('%s-- CLEAN (checked)\n' % depth)
+            debug('%s-- CLEAN (already checked)\n' % depth)
         return CLEAN  # has already been checked during this session
     if not f.stamp:
+        # TODO: how different is it than f.changed_runid == None
+        # how can there be no stamp if it has already been built
         debug('%s-- DIRTY (no stamp)\n' % depth)
         return DIRTY
 
@@ -52,8 +60,7 @@ def isdirty(f, depth, max_changed,
         elif mode == 'm':
             sub = isdirty(f2, depth = depth + '  ',
                           max_changed = max(f.changed_runid,
-                                            f.checked_runid),
-                          is_checked=is_checked, set_checked=set_checked)
+                                            f.checked_runid))
             if sub:
                 debug('%s-- DIRTY (sub)\n' % depth)
                 dirty = sub
@@ -90,7 +97,7 @@ def isdirty(f, depth, max_changed,
     # if we get here, it's because the target is clean
     if f.is_override:
         state.warn_override_clean(f.name)
-    set_checked(f)
+    f.set_checked()
     return CLEAN
 
 
