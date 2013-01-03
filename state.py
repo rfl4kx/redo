@@ -24,9 +24,6 @@ def fix_chdir(targets):
     Returns:
       targets, but relative to the (newly changed) os.getcwd().
     """
-    if vars.SHUFFLE:
-        import random
-        random.shuffle(targets)
     abs_pwd = os.path.join(vars.STARTDIR, vars.PWD)
     if os.path.samefile('.', abs_pwd):
         return targets  # nothing to change
@@ -76,6 +73,9 @@ class LockHelper:
             self.lock.waitlock(self.oldkind)
         else:
             self.lock.unlock()
+
+LOCK_EX = fcntl.LOCK_EX
+LOCK_SH = fcntl.LOCK_SH
 
 class Lock:
     def __init__(self, name):
@@ -138,7 +138,7 @@ class File(object):
             except: pass
             self.read_only = not os.path.isdir(self.redo_dir)
             if not self.read_only:
-                self.lock = Lock(self.tmpfilename("lock"))
+                self.dolock = Lock(self.tmpfilename("do.lock"))
         self.refresh()
 
     def __repr__(self):
@@ -189,13 +189,6 @@ class File(object):
             self.csum = None
             self.stamp = str(vars.RUNID)
             return
-        if self.read_only:
-            self._refresh_locked()
-        else:
-            with self.lock.read():
-                self._refresh_locked()
-
-    def _refresh_locked(self):
         assert(not self.name.startswith('/'))
         try:
             # read the state file
@@ -219,7 +212,7 @@ class File(object):
                 self.deps = []
                 self.is_generated = False
                 self.csum = None
-                self.stamp = self.read_stamp()
+                self.stamp = self.read_stamp(st=st)
         else:
             # it's a target (with a .deps file)
             st = os.fstat(f.fileno())
@@ -230,12 +223,17 @@ class File(object):
             self.csum = None
             self.stamp = lines.pop(-1)
             self.deps = [line.split(' ', 1) for line in lines]
+            # if the next line fails, it means that the .dep file is not
+            # correctly formatted
             while self.deps and self.deps[-1][1] == '.':
                 # a line added by redo-stamp
                 self.csum = self.deps.pop(-1)[0]
 
     def exists(self):
         return os.path.exists(self.name)
+
+    def exists_not_dir(self):
+        return os.path.exists(self.name) and not os.path.isdir(self.name)
 
     def forget(self):
         """Turn a 'target' file back into a 'source' file."""
@@ -253,19 +251,20 @@ class File(object):
 
     def build_starting(self):
         """Call this when you're about to start building this target."""
+        assert self.dolock.owned == self.dolock.exclusive
         depsname = self.tmpfilename('deps2')
         debug3('build starting: %r\n', depsname)
         unlink(depsname)
 
     def build_done(self, exitcode):
         """Call this when you're done building this target."""
+        assert self.dolock.owned == self.dolock.exclusive
         depsname = self.tmpfilename('deps2')
         debug3('build ending: %r\n', depsname)
         self._add(self.read_stamp(runid=vars.RUNID))
         self._add(exitcode)
         os.utime(depsname, (vars.RUNID, vars.RUNID))
-        with self.lock.write():
-            os.rename(depsname, self.tmpfilename('deps'))
+        os.rename(depsname, self.tmpfilename('deps'))
 
     def add_dep(self, file):
         """Mark the given File() object as a dependency of this target.
@@ -283,20 +282,25 @@ class File(object):
         assert('\r' not in file.stamp)
         self._add('%s %s' % (file.csum or file.stamp, relname))
 
-    def read_stamp(self, runid=None):
+    def read_stamp(self, runid=None, st=None, st_deps=None):
         # FIXME: make this formula more well-defined
         if runid is None:
-            try:
-                st_deps = os.stat(self.tmpfilename('deps'))
-            except OSError:
+            if st_deps == None:
+                try: st_deps = os.stat(self.tmpfilename('deps'))
+                except OSError: st_deps = False
+
+            if st_deps == False:
                 runid_suffix = ''
             else:
                 runid_suffix = '+' + str(int(st_deps.st_mtime))
         else:
             runid_suffix = '+' + str(int(runid))
-        try:
-            st = os.stat(self.name)
-        except OSError:
+
+        if st == None:
+            try: st = os.stat(self.name)
+            except OSError: st = False
+
+        if st == False:
             return STAMP_MISSING + runid_suffix
         if stat.S_ISDIR(st.st_mode):
             return STAMP_DIR + runid_suffix
@@ -304,18 +308,6 @@ class File(object):
             # a "unique identifier" stamp for a regular file
             return join('-', (st.st_ctime, st.st_mtime,
                               st.st_size, st.st_ino)) + runid_suffix
-
-    # FIXME: this function is confusing.  Various parts of the code need to
-    #  know whether they want the csum or the stamp, when in theory, the csum
-    #  should just override the stamp.
-    def csum_or_read_stamp(self):
-        newstamp = self.read_stamp()
-        if newstamp == self.stamp:
-            return self.csum or newstamp
-        else:
-            # old csum is meaningless because file changed after it was
-            # recorded.
-            return newstamp
 
 
 def is_missing(stamp):
