@@ -81,8 +81,6 @@ def run_client(targets = sys.argv[1:]):
             sh = sha.sha()
         else:
             sh = hashlib.sha1()
-    elif len(targets) == 0:
-        targets.append('all')
 
     if vars.SHUFFLE:
         import random

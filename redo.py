@@ -85,6 +85,7 @@ try:
             sys.exit(srv.exit_status or srv.child_status[pid])
         else: # parent
             srv.close()
+            if len(targets) == 0: targets.append('all')
             res = server.run_client(targets)
             os.kill(pid, signal.SIGTERM)
             sys.exit(res)
