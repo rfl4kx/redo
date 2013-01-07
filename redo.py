@@ -20,6 +20,8 @@ old-args   use old-style definitions of $1,$2,$3 (deprecated)
 main=      Choose which redo flavour to execute
 """
 
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+
 def read_opts():
     o = options.Options(optspec)
     (opt, flags, extra) = o.parse(sys.argv[1:])
@@ -30,8 +32,8 @@ def read_opts():
     if opt.overwrite:
         os.environ['REDO_OVERWRITE'] = '1'
     if opt.version:
-        import version
-        print version.TAG
+        from version import TAG
+        print TAG
         sys.exit(0)
     if opt.debug:
         os.environ['REDO_DEBUG'] = str(opt.debug or 0)
@@ -66,51 +68,73 @@ def set_main(arg0):
 
 
 def init(targets, redo_binaries=[]):
-    import time
-    import runid
     if not os.environ.get('REDO'):
         if len(targets) == 0:
             targets.append('all')
 
-        # create the bin dir
-        bindir = os.path.join(os.getcwd(), ".redo", "bin")
-        try: os.makedirs(bindir)
-        except: pass
-        main = os.path.realpath(sys.argv[0])
-        for exe in redo_binaries:
-            exe = os.path.join(bindir, exe)
-            try: os.unlink(exe)
+        dirname = os.path.dirname(os.path.realpath(__file__))
+        paths = [os.path.join(dirname, "bin"),
+                 os.path.join(dirname, "redo-sh")]
+
+        bindir = None
+        shdir = None
+
+        for p in paths:
+            p_redo = os.path.join(p, "redo")
+            if not bindir and os.path.exists(p_redo):
+                with os.popen("'%s' --version" % p_redo.replace("'", "'\"'\"'")) as f:
+                    from version import TAG as myver
+                    ver = f.read().strip()
+                    if ver == myver:
+                        bindir = p
+                    elif os.environ.get('REDO_DEBUG'):
+                        sys.stderr.write("%s: version %s different than %s\n" % (p_redo, ver, myver))
+            elif not shdir and os.path.exists(os.path.join(p, "sh")):
+                shdir = p
+            if shdir and bindir:
+                break
+
+        if not bindir:
+            bindir = os.path.join(os.getcwd(), ".redo", "bin")
+            try: os.makedirs(bindir)
             except: pass
-            os.symlink(main, exe)
-        os.environ['PATH'] = bindir + ":" + os.environ['PATH']
+            main = os.path.realpath(__file__)
+            for exe in redo_binaries:
+                exe = os.path.join(bindir, exe)
+                try: os.unlink(exe)
+                except: pass
+                os.symlink(main, exe)
+
+        if bindir: os.environ['PATH'] = bindir + ":" + os.environ['PATH']
+        if shdir:  os.environ['PATH'] = shdir  + ":" + os.environ['PATH']
         os.environ['REDO'] = os.path.join(bindir, "redo")
 
     if not os.environ.get('REDO_STARTDIR'):
+        import runid
         os.environ['REDO_STARTDIR'] = os.getcwd()
         os.environ['REDO_RUNID_FILE'] = '.redo/runid'
         runid.change('.redo/runid')
 
-if __name__ == '__main__':
-    try:
-        from main import mains
-        jobs, redo_flavour, targets = read_opts()
-        init(targets, mains.keys())
-        from log import err, debug
-        import jwack
+try:
+    from main import mains
+    jobs, redo_flavour, targets = read_opts()
+    init(targets, mains.keys())
+    from log import err, debug
+    import jwack
 
-        if not redo_flavour.startswith("redo"):
-            redo_flavour = "redo-%s" % redo_flavour
-        if redo_flavour not in mains:
-            err("invalid redo: %s\n", redo_flavour)
-            sys.exit(1)
+    if not redo_flavour.startswith("redo"):
+        redo_flavour = "redo-%s" % redo_flavour
+    if redo_flavour not in mains:
+        err("invalid redo: %s\n", redo_flavour)
+        sys.exit(1)
 
-        set_main(redo_flavour)
-        
-        if jobs < 1 or jobs > 1000:
-            err('invalid --jobs value: %r\n', opt.jobs)
-        jwack.setup(jobs)
-        
-        debug("%s %r\n", redo_flavour, targets)
-        sys.exit(mains[redo_flavour](redo_flavour, targets) or 0)
-    except KeyboardInterrupt:
-        sys.exit(200)
+    set_main(redo_flavour)
+    
+    if jobs < 1 or jobs > 1000:
+        err('invalid --jobs value: %r\n', opt.jobs)
+    jwack.setup(jobs)
+    
+    debug("%s %r\n", redo_flavour, targets)
+    sys.exit(mains[redo_flavour](redo_flavour, targets) or 0)
+except KeyboardInterrupt:
+    sys.exit(200)
