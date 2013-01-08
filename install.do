@@ -35,7 +35,7 @@ python -mcompileall $DESTDIR$LIBDIR
 
 # It's important for the file to actually be named 'sh'.  Some shells (like
 # bash and zsh) only go into POSIX-compatible mode if they have that name.
-cp -R redo-sh/sh $LIBEXECDIR/bin/sh
+cp -R redo-sh/sh $DESTDIR$LIBDIR/bin/sh
 
 # binaries
 for d in $(python -c 'from main import mains; print " ".join(mains.keys())'); do
