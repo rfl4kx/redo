@@ -20,6 +20,8 @@ old-args   use old-style definitions of $1,$2,$3 (deprecated)
 main=      Choose which redo flavour to execute
 """
 
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+
 def read_opts():
     o = options.Options(optspec)
     (opt, flags, extra) = o.parse(sys.argv[1:])
