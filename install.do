@@ -39,6 +39,6 @@ cp -R redo-sh/sh $LIBEXECDIR/bin/sh
 
 # binaries
 for d in $(python -c 'from main import mains; print " ".join(mains.keys())'); do
-	ln -sf $LIBDIR/bin/$d $DESTDIR$LIBDIR/bin/$d
-	ln -sf $LIBDIR/bin/$d $DESTDIR$BINDIR/$d
+	ln -sf $LIBDIR/redo.py $DESTDIR$LIBDIR/bin/$d
+	ln -sf $LIBDIR/redo.py $DESTDIR$BINDIR/$d
 done
