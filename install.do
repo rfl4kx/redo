@@ -25,7 +25,11 @@ $INSTALL -m 0644 README.md $DESTDIR$DOCDIR
 # .py files (precompiled to .pyc files for speed)
 for d in *.py version/*.py; do
 	fix=$(echo $d | sed 's,-,_,g')
-	$INSTALL -m 0644 $d $DESTDIR$LIBDIR/$fix
+	if [ d = redo.py ]; then
+		$INSTALL -m 0755 $d $DESTDIR$LIBDIR/$fix
+	else
+		$INSTALL -m 0644 $d $DESTDIR$LIBDIR/$fix
+	fi
 done
 python -mcompileall $DESTDIR$LIBDIR
 
@@ -37,5 +41,4 @@ cp -R redo-sh/sh $LIBEXECDIR/bin/sh
 for d in $(python -c 'from main import mains; print " ".join(mains.keys())'); do
 	ln -sf $LIBDIR/bin/$d $DESTDIR$LIBDIR/bin/$d
 	ln -sf $LIBDIR/bin/$d $DESTDIR$BINDIR/$d
-	chmod 0755 $DESTDIR$LIBDIR/bin/$d $DESTDIR$BINDIR/$d
 done
