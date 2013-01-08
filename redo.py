@@ -69,7 +69,6 @@ def set_main(arg0):
 
 def init(targets, redo_binaries=[]):
     if not os.environ.get('REDO'):
-        from version import TAG as myver
         if len(targets) == 0:
             targets.append('all')
 
@@ -84,6 +83,7 @@ def init(targets, redo_binaries=[]):
             p_redo = os.path.join(p, "redo")
             if not bindir and os.path.exists(p_redo):
                 with os.popen("'%s' --version" % p_redo.replace("'", "'\"'\"'")) as f:
+                    from version import TAG as myver
                     ver = f.read().strip()
                     if ver == myver:
                         bindir = p
