@@ -36,13 +36,12 @@ cp -R redo-sh/sh $LIBEXECDIR/sh
 
 # binaries
 for d in $(python -c 'from main import mains; print " ".join(mains.keys())'); do
-	fix=$(echo $d | sed -e 's,-,_,g')
 	cat >install.wrapper <<-EOF
 		#!/usr/bin/python
 		import sys, os;
 		exedir = os.path.dirname(os.path.abspath(sys.argv[0]))
 		sys.path.insert(0, os.path.join(exedir, '../lib/redo'))
-		import $fix
+		import redo
 	EOF
 	$INSTALL -m 0755 install.wrapper $BINDIR/$d
 	cat >install.wrapper <<-EOF
@@ -50,7 +49,7 @@ for d in $(python -c 'from main import mains; print " ".join(mains.keys())'); do
 		import sys, os;
 		exedir = os.path.dirname(os.path.abspath(sys.argv[0]))
 		sys.path.insert(0, os.path.join(exedir, '../../lib/redo'))
-		import $fix
+		import redo
 	EOF
 	$INSTALL -m 0755 install.wrapper $LIBEXECDIR/$d
 done
