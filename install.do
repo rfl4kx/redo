@@ -7,12 +7,13 @@ redo-ifchange _all redo-sh.dir
 : ${MANDIR:=$DESTDIR$PREFIX/share/man}
 : ${DOCDIR:=$DESTDIR$PREFIX/share/doc/redo}
 : ${BINDIR:=$DESTDIR$PREFIX/bin}
+: ${LIBEXECDIR:=$DESTDIR$PREFIX/libexec/redo}
 : ${LIBDIR:=$DESTDIR$PREFIX/lib/redo}
 
 echo "Installing to: $DESTDIR$PREFIX"
 
 # make dirs
-$INSTALL -d $DOCDIR $BINDIR $LIBDIR $LIBDIR/version
+$INSTALL -d $DOCDIR $BINDIR $LIBEXECDIR $LIBDIR $LIBDIR/version
 test -e Documentation/redo.1 && $INSTALL -d $MANDIR/man1
 
 # docs
@@ -31,7 +32,7 @@ python -mcompileall $LIBDIR
 
 # It's important for the file to actually be named 'sh'.  Some shells (like
 # bash and zsh) only go into POSIX-compatible mode if they have that name.
-cp -R redo-sh/sh $LIBDIR/sh
+cp -R redo-sh/sh $LIBEXECDIR/sh
 
 # binaries
 for d in $(python -c 'from main import mains; print " ".join(mains.keys())'); do
@@ -44,5 +45,13 @@ for d in $(python -c 'from main import mains; print " ".join(mains.keys())'); do
 		import $fix
 	EOF
 	$INSTALL -m 0755 install.wrapper $BINDIR/$d
+	cat >install.wrapper <<-EOF
+		#!/usr/bin/python
+		import sys, os;
+		exedir = os.path.dirname(os.path.abspath(sys.argv[0]))
+		sys.path.insert(0, os.path.join(exedir, '../../lib/redo'))
+		import $fix
+	EOF
+	$INSTALL -m 0755 install.wrapper $LIBEXECDIR/$d
 done
 rm -f install.wrapper

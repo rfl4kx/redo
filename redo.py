@@ -30,8 +30,8 @@ def read_opts():
     if opt.overwrite:
         os.environ['REDO_OVERWRITE'] = '1'
     if opt.version:
-        import version
-        print version.TAG
+        from version import TAG
+        print TAG
         sys.exit(0)
     if opt.debug:
         os.environ['REDO_DEBUG'] = str(opt.debug or 0)
@@ -66,26 +66,51 @@ def set_main(arg0):
 
 
 def init(targets, redo_binaries=[]):
-    import time
-    import runid
     if not os.environ.get('REDO'):
+        from version import TAG as myver
         if len(targets) == 0:
             targets.append('all')
 
-        # create the bin dir
-        bindir = os.path.join(os.getcwd(), ".redo", "bin")
-        try: os.makedirs(bindir)
-        except: pass
-        main = os.path.realpath(sys.argv[0])
-        for exe in redo_binaries:
-            exe = os.path.join(bindir, exe)
-            try: os.unlink(exe)
+        dirnames = [os.path.dirname(os.path.abspath(sys.argv[0])),
+                    os.path.dirname(os.path.realpath(sys.argv[0]))]
+        paths = ([os.path.join(d, "..", "libexec", "redo") for d in dirnames] +
+                 [os.path.join(d, "..", "lib", "redo", "bin") for d in dirnames] +
+                 [os.path.join(d, "redo-sh") for d in dirnames])
+
+        bindir = None
+        shdir = None
+
+        for p in paths:
+            p_redo = os.path.join(p, "redo")
+            if not bindir and os.path.exists(p_redo):
+                with os.popen("'%s' --version" % p_redo.replace("'", "'\"'\"'")) as f:
+                    ver = f.read().strip()
+                    if ver == myver:
+                        bindir = p
+                    elif os.environ.get('REDO_DEBUG'):
+                        sys.stderr.write("%s: version %s different than %s\n" % (p_redo, ver, myver))
+            elif not shdir and os.path.exists(os.path.join(p, "sh")):
+                shdir = p
+            if shdir and bindir:
+                break
+
+        if not bindir:
+            bindir = os.path.join(os.getcwd(), ".redo", "bin")
+            try: os.makedirs(bindir)
             except: pass
-            os.symlink(main, exe)
-        os.environ['PATH'] = bindir + ":" + os.environ['PATH']
+            main = os.path.realpath(sys.argv[0])
+            for exe in redo_binaries:
+                exe = os.path.join(bindir, exe)
+                try: os.unlink(exe)
+                except: pass
+                os.symlink(main, exe)
+
+        if bindir: os.environ['PATH'] = bindir + ":" + os.environ['PATH']
+        if shdir:  os.environ['PATH'] = shdir  + ":" + os.environ['PATH']
         os.environ['REDO'] = os.path.join(bindir, "redo")
 
     if not os.environ.get('REDO_STARTDIR'):
+        import runid
         os.environ['REDO_STARTDIR'] = os.getcwd()
         os.environ['REDO_RUNID_FILE'] = '.redo/runid'
         runid.change('.redo/runid')
