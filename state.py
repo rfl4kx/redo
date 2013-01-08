@@ -284,7 +284,10 @@ class File(object):
         exist, creating the file is considered a "modified" event and will
         result in this target being rebuilt.
         """
-        relname = os.path.relpath(file.name, self.dir)
+        if file.name == ALWAYS:
+            relname = file.name
+        else:
+            relname = os.path.relpath(file.name, self.dir)
         debug3('add-dep: %r < %r %r\n', self.name, file.stamp, relname)
         assert('\n' not in file.name)
         assert(' '  not in file.stamp)

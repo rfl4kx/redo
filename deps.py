@@ -22,9 +22,6 @@ def isdirty(f, depth, expect_stamp, max_runid):
     if f.stamp_mtime > max_runid:
         debug('%s-- DIRTY (built)\n', depth)
         return DIRTY
-    if f.stamp_mtime >= vars.RUNID:
-        debug('%s-- CLEAN (checked)\n', depth)
-        return CLEAN  # has already been checked during this session
     if not f.stamp:
         debug('%s-- DIRTY (no stamp)\n', depth)
         return DIRTY
@@ -54,13 +51,23 @@ def isdirty(f, depth, expect_stamp, max_runid):
     must_build = []
     for stamp2, f2 in f.deps:
         dirty = CLEAN
-        f2 = state.File(f2, f.dir)
-        sub = isdirty(f2, depth = depth + '  ',
-                      expect_stamp = stamp2,
-                      max_runid = max(f.stamp_mtime, vars.RUNID))
-        if sub:
-            debug('%s-- DIRTY (sub)\n', depth)
-            dirty = sub
+
+        if f2 == state.ALWAYS:
+            if f.stamp_mtime >= vars.RUNID:
+                # has already been checked during this session
+                debug('%s-- CLEAN (always, checked)\n', depth)
+            else:
+                debug('%s-- DIRTY (always)\n', depth)
+                dirty = DIRTY
+        else:
+            f2 = state.File(f2, f.dir)
+            sub = isdirty(f2, depth = depth + '  ',
+                          expect_stamp = stamp2,
+                          max_runid = max(f.stamp_mtime, vars.RUNID))
+            if sub:
+                debug('%s-- DIRTY (sub)\n', depth)
+                dirty = sub
+
         if not f.csum:
             # f is a "normal" target: dirty f2 means f is instantly dirty
             if dirty:

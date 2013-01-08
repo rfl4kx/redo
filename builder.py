@@ -98,10 +98,6 @@ class BuildJob:
 
     def prepare(self):
         assert self.target.dolock.owned == state.LOCK_EX
-        if not self.re_do and self.target.is_generated and self.target.runid == vars.RUNID:
-            debug3('already built %r\n', self.target)
-            return self.target.exitcode
-
         debug3('think about building %r\n', self.target.name)
         self.target.build_starting()
         self.before_t = _try_stat(self.target.name)
@@ -312,7 +308,6 @@ class BuildJob:
 
     def schedule_job(self):
         assert self.target.dolock.owned == state.LOCK_EX
-        self.target.refresh()
         rv = self.prepare()
         if rv != None:
             self.result[0] += rv
@@ -321,23 +316,28 @@ class BuildJob:
             jwack.start_job(self.target, self.build, self.done)
 
 def build(f, any_errors, should_build, add_dep_to=None, delegate=None, re_do=True):
-    dirty = should_build(f)
-    while dirty and dirty != deps.DIRTY:
-        # FIXME: bring back the old (targetname) notation in the output
-        #  when we need to do this.  And add comments.
-        for t2 in dirty:
-            build(t2, any_errors, should_build, delegate, re_do)
-            if any_errors[0] and not vars.KEEP_GOING:
-                return
-        jwack.wait_all()
-        dirty = should_build(f)
-        #assert(dirty in (deps.DIRTY, deps.CLEAN))
-    if dirty:
-        job = BuildJob(f, any_errors, add_dep_to, delegate, re_do)
+    if not f.read_only:
         f.dolock.waitlock()
-        job.schedule_job()
-        # jwack.wait_all() # temp: wait for the job to complete
-    elif add_dep_to:
+        f.refresh()
+        dirty = should_build(f)
+        while dirty and dirty != deps.DIRTY:
+            # FIXME: bring back the old (targetname) notation in the output
+            #  when we need to do this.  And add comments.
+            for t2 in dirty:
+                build(t2, any_errors, should_build, delegate, re_do)
+                if any_errors[0] and not vars.KEEP_GOING:
+                    return
+            jwack.wait_all()
+            dirty = should_build(f)
+            #assert(dirty in (deps.DIRTY, deps.CLEAN))
+        if dirty:
+            job = BuildJob(f, any_errors, add_dep_to, delegate, re_do)
+            add_dep_to = None
+            job.schedule_job()
+            # jwack.wait_all() # temp: wait for the job to complete
+        else:
+            f.dolock.unlock()
+    if add_dep_to:
         f.refresh()
         add_dep_to.add_dep(f)
 
