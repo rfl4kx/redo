@@ -25,7 +25,7 @@ $INSTALL -m 0644 README.md $DESTDIR$DOCDIR
 # .py files (precompiled to .pyc files for speed)
 for d in *.py version/*.py; do
 	fix=$(echo $d | sed 's,-,_,g')
-	if [ d = redo.py ]; then
+	if [ $d = redo.py ]; then
 		$INSTALL -m 0755 $d $DESTDIR$LIBDIR/$fix
 	else
 		$INSTALL -m 0644 $d $DESTDIR$LIBDIR/$fix
