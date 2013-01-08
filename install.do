@@ -1,5 +1,5 @@
 exec >&2
-redo-ifchange _all
+redo-ifchange _all redo-sh.dir
 
 : ${INSTALL:=install}
 : ${DESTDIR:=}
