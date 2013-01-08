@@ -71,12 +71,9 @@ def init(targets, redo_binaries=[]):
         if len(targets) == 0:
             targets.append('all')
 
-        dirnames = [os.path.dirname(os.path.abspath(sys.argv[0])),
-                    os.path.dirname(os.path.realpath(sys.argv[0]),
-                    os.path.dirname(os.path.dirname(os.path.realpath(__file__)))]
-        paths = ([os.path.join(d, "..", "libexec", "redo") for d in dirnames] +
-                 [os.path.join(d, "..", "lib", "redo", "bin") for d in dirnames] +
-                 [os.path.join(d, "redo-sh") for d in dirnames])
+        dirname = os.path.dirname(os.path.realpath(__file__))
+        paths = [os.path.join(dirname, "bin"),
+                 os.path.join(dirname, "redo-sh")]
 
         bindir = None
         shdir = None
