@@ -34,8 +34,7 @@ python -mcompileall $LIBDIR
 cp -R redo-sh/sh $LIBDIR/sh
 
 # binaries
-for dd in redo*.py; do
-	d=$(basename $dd .py)
+for d in $(python -c 'from main import mains; print " ".join(mains.keys())'); do
 	fix=$(echo $d | sed -e 's,-,_,g')
 	cat >install.wrapper <<-EOF
 		#!/usr/bin/python
