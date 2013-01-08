@@ -72,7 +72,8 @@ def init(targets, redo_binaries=[]):
             targets.append('all')
 
         dirnames = [os.path.dirname(os.path.abspath(sys.argv[0])),
-                    os.path.dirname(os.path.realpath(sys.argv[0]))]
+                    os.path.dirname(os.path.realpath(sys.argv[0]),
+                    os.path.dirname(os.path.dirname(os.path.realpath(__file__)))]
         paths = ([os.path.join(d, "..", "libexec", "redo") for d in dirnames] +
                  [os.path.join(d, "..", "lib", "redo", "bin") for d in dirnames] +
                  [os.path.join(d, "redo-sh") for d in dirnames])
@@ -98,7 +99,7 @@ def init(targets, redo_binaries=[]):
             bindir = os.path.join(os.getcwd(), ".redo", "bin")
             try: os.makedirs(bindir)
             except: pass
-            main = os.path.realpath(sys.argv[0])
+            main = os.path.realpath(__file__)
             for exe in redo_binaries:
                 exe = os.path.join(bindir, exe)
                 try: os.unlink(exe)
