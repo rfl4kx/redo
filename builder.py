@@ -192,6 +192,7 @@ class BuildJob:
             if not interpreter:
                 err('%s unable to find interpreter %s.\n', self.dofile, interp_argv[0])
                 os._exit(208)
+            self.target.add_dep(state.File(interpreter))
             argv[0:2] = [interpreter] + interp_argv[1:]
         elif firstline.startswith('#!/'):
             argv[0:2] = firstline[2:].split(' ')
