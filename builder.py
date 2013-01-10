@@ -237,6 +237,7 @@ class BuildJob:
             elif vars.OLD_STDOUT and st2 and st1.st_size > 0:
                 err('%s wrote to stdout *and* created $3.\n', self.dofile)
                 err('...you should write status messages to stderr, not stdout.\n')
+                rv = 207
 
             elif vars.WARN_STDOUT and st1.st_size > 0:
                 err('%s wrote to stdout, this is not longer supported.\n', self.dofile)
