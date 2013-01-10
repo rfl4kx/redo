@@ -1,4 +1,4 @@
-import os
+import os, sys
 from atoi import atoi
 import runid
 
@@ -52,6 +52,10 @@ KEEP_GOING = os.environ.get('REDO_KEEP_GOING', '') and 1 or 0
 
 # The value of the --shuffle flag.
 SHUFFLE = os.environ.get('REDO_SHUFFLE', '') and 1 or 0
+
+# The value of the --color flag, or an auto detected value.
+_color = sys.stderr.isatty() and (os.environ.get('TERM') or 'dumb') != 'dumb'
+COLOR = atoi(os.environ.get('REDO_COLOR', '1' if _color else '0'))
 
 # The id of the current redo execution; an int(time.time()) value.
 RUNID_FILE = os.environ.get('REDO_RUNID_FILE')

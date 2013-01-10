@@ -8,7 +8,7 @@ YELLOW = ""
 BOLD   = ""
 PLAIN  = ""
 
-if sys.stderr.isatty() and (os.environ.get('TERM') or 'dumb') != 'dumb':
+if vars.COLOR:
     # ...use ANSI formatting codes.
     RED    = "\x1b[31m"
     GREEN  = "\x1b[32m"

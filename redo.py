@@ -17,6 +17,7 @@ debug-locks  print messages about file locking (useful for debugging)
 debug-pids   print process ids as part of log messages (useful for debugging)
 version    print the current version and exit
 old-args   use old-style definitions of $1,$2,$3 (deprecated)
+color      force enable color (--no-color to disable)
 main=      Choose which redo flavour to execute
 """
 
@@ -51,6 +52,8 @@ def read_opts():
         os.environ['REDO_DEBUG_PIDS'] = '1'
     if opt.old_args:
         os.environ['REDO_OLD_ARGS'] = '1'
+    if opt.color != None:
+        os.environ['REDO_COLOR'] = str(opt.color)
     if opt.main:
         redo_flavour = opt.main
 
