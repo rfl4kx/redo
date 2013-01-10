@@ -2,6 +2,7 @@ import sys, os, errno, stat
 import vars, state, jwack, deps, logger
 from helpers import unlink, close_on_exec, join
 from log import log, log_, debug, debug2, debug3, err, warn
+from logger import log_cmd
 
 
 def _default_do_files(filename):
@@ -201,6 +202,7 @@ class BuildJob:
         elif firstline.startswith('#!/'):
             argv[0:2] = firstline[2:].split(' ')
         log('%s\n', self.target.printable_name())
+        log_cmd("redo", self.target.name)
 
         try:
             dn = dodir
@@ -210,7 +212,6 @@ class BuildJob:
             if dn:
                 os.chdir(dn)
             l = logger.Logger(self.log_fd, self.tmp_sout_fd)
-            os.dup2(1, 3)
             l.fork()
             os.close(self.tmp_sout_fd)
             close_on_exec(1, False)
@@ -273,7 +274,7 @@ class BuildJob:
 
             if rv != 0:
                 if not vars.OUTPUT:
-                    logger.print_log(self.tmpname_log)
+                    logger.print_log(self.target)
                 err('%s: exit code %d\n', self.target.printable_name(), rv)
             self.target.build_done(exitcode=rv)
             self.target.refresh()

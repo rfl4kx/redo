@@ -17,17 +17,23 @@ if vars.COLOR:
     PLAIN  = "\x1b[m"
 
 
+LOGFILE = sys.stderr
+if vars.LOGFD[0]:
+    LOGFILE = os.fdopen(vars.LOGFD[0], "w")
+
+
 def log_(s, *args):
     if args:
         ss = s % args
     else:
         ss = s
     sys.stdout.flush()
-    if vars.DEBUG_PIDS:
-        sys.stderr.write('%d %s' % (os.getpid(), ss))
-    else:
-        sys.stderr.write(ss)
     sys.stderr.flush()
+    if vars.DEBUG_PIDS:
+        LOGFILE.write('%d %s' % (os.getpid(), ss))
+    else:
+        LOGFILE.write(ss)
+    LOGFILE.flush()
 
 
 def log(s, *args):

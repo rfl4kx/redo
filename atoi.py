@@ -1,6 +1,6 @@
 
-def atoi(v):
+def atoi(v, default=0):
     try:
-        return int(v or 0)
+        return int(v)
     except ValueError:
-        return 0
+        return default
