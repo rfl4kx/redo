@@ -4,6 +4,12 @@ def main_redo(redo_flavour, targets):
     targets = state.fix_chdir(targets)
     return builder.main(targets)
 
+def main_redo_log(redo_flavour, targets):
+    import state, logger
+
+    targets = state.fix_chdir(targets)
+    return logger.main(targets)
+
 def main_redo_delegate(redo_flavour, targets):
     import builder, state, vars
     from log import debug2
@@ -140,4 +146,5 @@ mains = {
     'redo-ifcreate': main_redo_ifcreate,
     'redo-ifchange': main_redo_ifchange,
     'redo-delegate': main_redo_delegate,
+    'redo-log':      main_redo_log,
     'redo':          main_redo}

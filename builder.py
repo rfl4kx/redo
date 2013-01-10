@@ -1,5 +1,5 @@
 import sys, os, errno, stat
-import vars, state, jwack, deps
+import vars, state, jwack, deps, logger
 from helpers import unlink, close_on_exec, join
 from log import log, log_, debug, debug2, debug3, err, warn
 
@@ -144,8 +144,12 @@ class BuildJob:
         self.tmpname_sout = self.target.tmpfilename('out.tmp')
         # name provided as $3
         self.tmpname_arg3 = os.path.join(self.outdir, self.target.basename())
+        # name for the log file
+        self.tmpname_log = self.target.tmpfilename('log')
         unlink(self.tmpname_sout)
         unlink(self.tmpname_arg3)
+        unlink(self.tmpname_log)
+        self.log_fd = os.open(self.tmpname_log, os.O_CREAT|os.O_WRONLY|os.O_APPEND|os.O_EXCL, 0666)
         self.tmp_sout_fd = os.open(self.tmpname_sout, os.O_CREAT|os.O_RDWR|os.O_EXCL, 0666)
         close_on_exec(self.tmp_sout_fd, True)
         self.tmp_sout_f = os.fdopen(self.tmp_sout_fd, 'w+')
@@ -205,9 +209,10 @@ class BuildJob:
             os.environ['REDO_DEPTH'] = vars.DEPTH + '  '
             if dn:
                 os.chdir(dn)
+            l = logger.Logger(self.log_fd, self.tmp_sout_fd)
             os.dup2(1, 3)
-            os.dup2(self.tmp_sout_f.fileno(), 1)
-            os.close(self.tmp_sout_f.fileno())
+            l.fork()
+            os.close(self.tmp_sout_fd)
             close_on_exec(1, False)
             if vars.VERBOSE or vars.XTRACE: log_('* %s\n' % ' '.join(argv))
             os.execvp(argv[0], argv)
@@ -267,6 +272,8 @@ class BuildJob:
                 unlink(self.tmpname_arg3)
 
             if rv != 0:
+                if not vars.OUTPUT:
+                    logger.print_log(self.tmpname_log)
                 err('%s: exit code %d\n', self.target.printable_name(), rv)
             self.target.build_done(exitcode=rv)
             self.target.refresh()
