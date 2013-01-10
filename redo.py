@@ -85,13 +85,17 @@ def init(targets, redo_binaries=[]):
         for p in paths:
             p_redo = os.path.join(p, "redo")
             if not bindir and os.path.exists(p_redo):
-                with os.popen("'%s' --version" % p_redo.replace("'", "'\"'\"'")) as f:
+                try:
                     from version import TAG as myver
-                    ver = f.read().strip()
-                    if ver == myver:
-                        bindir = p
-                    elif os.environ.get('REDO_DEBUG'):
-                        sys.stderr.write("%s: version %s different than %s\n" % (p_redo, ver, myver))
+                except:
+                    pass
+                else:
+                    with os.popen("'%s' --version" % p_redo.replace("'", "'\"'\"'")) as f:
+                        ver = f.read().strip()
+                        if ver == myver:
+                            bindir = p
+                        elif os.environ.get('REDO_DEBUG'):
+                            sys.stderr.write("%s: version %s different than %s\n" % (p_redo, ver, myver))
             elif not shdir and os.path.exists(os.path.join(p, "sh")):
                 shdir = p
             if shdir and bindir:
