@@ -41,6 +41,12 @@ DEBUG_LOCKS = os.environ.get('REDO_DEBUG_LOCKS', '') and 1 or 0
 # The value of the --old-args flag.
 OLD_ARGS = os.environ.get('REDO_OLD_ARGS', '') and 1 or 0
 
+# The value of the --old-stdout flag.
+OLD_STDOUT = os.environ.get('REDO_OLD_STDOUT', '') and 1 or 0
+
+# The value of the --warn-stdout flag.
+WARN_STDOUT = os.environ.get('REDO_WARN_STDOUT', '') and 1 or 0
+
 # The value of the -v flag.
 VERBOSE = os.environ.get('REDO_VERBOSE', '') and 1 or 0
 
