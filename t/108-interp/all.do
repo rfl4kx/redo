@@ -1,3 +1,4 @@
+. ../skip-if-minimal-do.sh
 rm -f exe1.log exe2.log
 
 redo a b

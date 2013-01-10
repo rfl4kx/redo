@@ -1,3 +1,5 @@
+. ../skip-if-minimal-do.sh
+
 touch dep
 mkdir -p x/y
 : > x/y/z.dual.log

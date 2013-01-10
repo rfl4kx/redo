@@ -1,3 +1,4 @@
+. ../skip-if-minimal-do.sh
 rm -rf x do/log
 mkdir -p x/y
 redo x/y/z
