@@ -1,3 +1,4 @@
+exec >"$3"
 echo n2-$2
 echo $2 >>$2.count
 echo $2 >>in.countall

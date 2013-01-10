@@ -234,23 +234,16 @@ class BuildJob:
                     err('...you should update $3 (a temp file) or stdout, not $1.\n')
                     rv = 206
             
-            elif st2 and st1.st_size > 0:
-                err('%s wrote to stdout *and* created $3.\n', self.dofile)
+            elif st1.st_size > 0:
+                err('%s wrote to stdout, this is not longer supported.\n', self.dofile)
                 err('...you should write status messages to stderr, not stdout.\n')
+                err('...you should write target content to $3 using for example \'exec >"$3"`.\n')
                 rv = 207
             
             if rv==0:
                 if st2:
                     os.rename(self.tmpname_arg3, self.target.name)
                     os.unlink(self.tmpname_sout)
-                elif st1.st_size > 0:
-                    try:
-                        os.rename(self.tmpname_sout, self.target.name)
-                    except OSError, e:
-                        if e.errno == errno.ENOENT:
-                            unlink(self.target.name)
-                        else:
-                            raise
                 else: # no output generated at all; that's ok
                     unlink(self.tmpname_sout)
                     unlink(self.target.name)

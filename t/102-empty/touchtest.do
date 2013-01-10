@@ -1,4 +1,4 @@
-echo 'echo hello' >touch1.do
+echo 'echo hello >"$3"' >touch1.do
 redo touch1
 [ -e touch1 ] || exit 55
 rm -f touch1

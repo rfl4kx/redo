@@ -1,4 +1,4 @@
-echo 'echo hello' >silence.do
+echo 'echo hello >"$3"' >silence.do
 redo silence
 [ -e silence ] || exit 55
 echo 'true' >silence.do

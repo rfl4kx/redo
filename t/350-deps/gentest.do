@@ -1,6 +1,6 @@
 rm -f genfile2 genfile2.do genfile.log
 
-echo echo hello >genfile2.do
+echo 'echo hello >$3' >genfile2.do
 ../flush-cache
 redo genfile1
 

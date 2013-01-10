@@ -35,6 +35,7 @@ names_to_tag()
 
 sTAG=$(names_to_tag "$NAMES")
 
+exec >"$3"
 echo "COMMIT='$COMMIT'"
 echo "TAG='$sTAG'"
 echo "DATE='${DATE%% *}'"

@@ -1,1 +1,1 @@
-echo "I'm stinky"
+echo "I'm stinky" >"$3"

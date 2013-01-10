@@ -1,3 +1,4 @@
+exec >"$3"
 redo-ifchange CC hello.c /usr/include/stdio.h
 redo-ifcreate stdio.h
 ../sleep 3

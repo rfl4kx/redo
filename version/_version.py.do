@@ -1,3 +1,3 @@
 redo-ifchange vars
-cat vars
+cat vars >"$3"
 

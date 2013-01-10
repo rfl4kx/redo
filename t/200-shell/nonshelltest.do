@@ -1,3 +1,4 @@
 #!/usr/bin/env perl
 $a="perly";
-print "hello $a world\n";
+open TARGET, "<", "$ARGV[2]";
+print TARGET "hello $a world\n";

@@ -1,2 +1,2 @@
 redo-ifchange t1dep
-echo $$
+echo $$ >"$3"
