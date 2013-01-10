@@ -17,47 +17,68 @@ if vars.COLOR:
     PLAIN  = "\x1b[m"
 
 
-LOGFILE = sys.stderr
-if vars.LOGFD[0]:
-    LOGFILE = os.fdopen(vars.LOGFD[0], "w")
+LOGFILE = os.fdopen(vars.LOGFD[0], "w") if vars.LOGFD[0] else sys.stderr
+LOGCMD  = os.fdopen(vars.LOGFD[1], "w") if vars.LOGFD[1] else None
 
 
-def log_(s, *args):
+def _cmd_encode(stamp, line):
+    return "\0%s\0%s" % (stamp, line.replace("\0", "\0z\0"))
+
+
+def log_cmd(cmd, arg):
+    if LOGCMD:
+        LOGCMD.write(_cmd_encode(cmd, arg))
+        LOGCMD.flush()
+
+
+def _fmt(s, *args):
     if args:
-        ss = s % args
+        return s % args
     else:
-        ss = s
+        return s
+    
+
+def _log(f, s, *args):
+    ss = _fmt(s, *args)
     sys.stdout.flush()
     sys.stderr.flush()
+    f.flush()
     if vars.DEBUG_PIDS:
-        LOGFILE.write('%d %s' % (os.getpid(), ss))
+        f.write('%d %s' % (os.getpid(), ss))
     else:
-        LOGFILE.write(ss)
-    LOGFILE.flush()
+        f.write(ss)
+    f.flush()
 
+def log_e(s, *args):
+    _log(sys.stderr, s, *args)
+
+def log_l(s, *args):
+    _log(LOGFILE, s, *args)
 
 def log(s, *args):
-    log_(''.join([GREEN,  "redo  ", vars.DEPTH, BOLD, s, PLAIN]), *args)
+    log_l(''.join([GREEN,  "redo  ", vars.DEPTH, BOLD, s, PLAIN]), *args)
 
 
 def err(s, *args):
-    log_(''.join([RED,    "redo  ", vars.DEPTH, BOLD, s, PLAIN]), *args)
+    log_l(''.join([RED,    "redo  ", vars.DEPTH, BOLD, s, PLAIN]), *args)
+    log_cmd("redo_err", _fmt(s, *args))
 
 
 def warn(s, *args):
-    log_(''.join([YELLOW, "redo  ", vars.DEPTH, BOLD, s, PLAIN]), *args)
+    log_l(''.join([YELLOW, "redo  ", vars.DEPTH, BOLD, s, PLAIN]), *args)
+    log_cmd("redo_warn", _fmt(s, *args))
 
 
 def debug(s, *args):
     if vars.DEBUG >= 1:
-        log_('redo: %s%s' % (vars.DEPTH, s), *args)
+        log_l('redo: %s%s' % (vars.DEPTH, s), *args)
 
 
 def debug2(s, *args):
     if vars.DEBUG >= 2:
-        log_('redo: %s%s' % (vars.DEPTH, s), *args)
+        log_l('redo: %s%s' % (vars.DEPTH, s), *args)
 
 
 def debug3(s, *args):
     if vars.DEBUG >= 3:
-        log_('redo: %s%s' % (vars.DEPTH, s), *args)
+        log_l('redo: %s%s' % (vars.DEPTH, s), *args)

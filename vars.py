@@ -47,8 +47,8 @@ OLD_STDOUT = os.environ.get('REDO_OLD_STDOUT', '') and 1 or 0
 # The value of the --warn-stdout flag.
 WARN_STDOUT = os.environ.get('REDO_WARN_STDOUT', '') and 1 or 0
 
-# The value of the --output flag.
-OUTPUT = os.environ.get('REDO_OUTPUT', '') and 1 or 0
+# The value of the --only-log flag.
+ONLY_LOG = os.environ.get('REDO_ONLY_LOG', '') and 1 or 0
 
 # The value of the -v flag.
 VERBOSE = os.environ.get('REDO_VERBOSE', '') and 1 or 0

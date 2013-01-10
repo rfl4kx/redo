@@ -1,8 +1,7 @@
 import sys, os, errno, stat
 import vars, state, jwack, deps, logger
 from helpers import unlink, close_on_exec, join
-from log import log, log_, debug, debug2, debug3, err, warn
-from logger import log_cmd
+from log import log, log_e, debug, debug2, debug3, err, warn, log_cmd
 
 
 def _default_do_files(filename):
@@ -187,7 +186,7 @@ class BuildJob:
                 ]
         if vars.VERBOSE: argv[1] += 'v'
         if vars.XTRACE: argv[1] += 'x'
-        if vars.VERBOSE or vars.XTRACE: log_('\n')
+        if vars.VERBOSE or vars.XTRACE: log_e('\n')
 
         firstline = open(os.path.join(dodir, dofile)).readline().strip()
         if firstline.startswith('#!.../'):
@@ -215,7 +214,7 @@ class BuildJob:
             l.fork()
             os.close(self.tmp_sout_fd)
             close_on_exec(1, False)
-            if vars.VERBOSE or vars.XTRACE: log_('* %s\n' % ' '.join(argv))
+            if vars.VERBOSE or vars.XTRACE: log_e('* %s\n' % ' '.join(argv))
             os.execvp(argv[0], argv)
         except:
             import traceback
@@ -273,7 +272,7 @@ class BuildJob:
                 unlink(self.tmpname_arg3)
 
             if rv != 0:
-                if not vars.OUTPUT:
+                if vars.ONLY_LOG:
                     logger.print_log(self.target)
                 err('%s: exit code %d\n', self.target.printable_name(), rv)
             self.target.build_done(exitcode=rv)

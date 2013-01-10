@@ -1,16 +1,8 @@
 import os, sys
 import vars, state
-from log import log, err, LOGFILE
+from log import log, err, LOGFILE, _cmd_encode
 from helpers import close_on_exec
 
-
-LOGCMD = None
-if vars.LOGFD[1]:
-    LOGCMD = os.fdopen(vars.LOGFD[1], "w")
-
-
-def _encode(stamp, line):
-    return "\0%s\0%s" % (stamp, line.replace("\0", "\0z\0"))
 
 class Logger:
     def __init__(self, logfd, stdoutfd):
@@ -88,9 +80,9 @@ class Logger:
     def _main(self, f, stamp, sysout=None, stdoutfd=None, dbg=""):
         l = f.readline(1024)
         while len(l):
-            os.write(self.logfd, _encode(stamp, l))
+            os.write(self.logfd, _cmd_encode(stamp, l))
             os.fsync(self.logfd)
-            if vars.OUTPUT and sysout:
+            if not vars.ONLY_LOG and sysout:
                 os.write(sysout.fileno(), l)
                 try: os.fsync(sysout.fileno())
                 except: pass
@@ -132,6 +124,11 @@ def _flush_err(t, buf):
     sys.stderr.write(buf)
     sys.stderr.flush()
 
+def _flush_redo_err(t, buf):
+    err("  " + buf)
+
+def _flush_redo_warn(t, buf):
+    warn("  " + buf)
 
 def _flush_log(t, buf):
     LOGFILE.write(buf)
@@ -167,6 +164,12 @@ def print_log(t, recursive=False):
                     elif cmdbuf == "redo" and recursive:
                         flush(t, argbuf)
                         flush, argbuf = _flush_redo, ""
+                    elif cmdbuf == "redo_err" and recursive:
+                        flush(t, argbuf)
+                        flush, argbuf = _flush_redo_err, ""
+                    elif cmdbuf == "redo_warn" and recursive:
+                        flush(t, argbuf)
+                        flush, argbuf = _flush_redo_warn, ""
                     else:
                         flush(t, argbuf)
                         flush, argbuf = _flush_none, ""
@@ -179,13 +182,7 @@ def print_log(t, recursive=False):
     flush(t, argbuf)
 
 
-def log_cmd(cmd, arg):
-    if LOGCMD:
-        LOGCMD.write(_encode(cmd, arg))
-        LOGCMD.flush()
-
-
-def main(targets):
+def main(targets, toplevel=False):
     for t in targets:
         f = state.File(name=t)
         l = f.tmpfilename('log')
@@ -196,5 +193,5 @@ def main(targets):
             print_log(f, recursive=True)
         if f.exitcode == 0:
             log('%s (done)\n', f.printable_name())
-        elif f.exitcode != None:
+        elif toplevel and f.exitcode != None:
             err('%s: exit code %d\n', f.printable_name(), f.exitcode)

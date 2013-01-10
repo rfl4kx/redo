@@ -8,7 +8,7 @@ def main_redo_log(redo_flavour, targets):
     import state, logger
 
     targets = state.fix_chdir(targets)
-    return logger.main(targets)
+    return logger.main(targets, toplevel=True)
 
 def main_redo_delegate(redo_flavour, targets):
     import builder, state, vars
