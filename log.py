@@ -56,17 +56,23 @@ def log_e(s, *args):
 def log_l(s, *args):
     _log(LOGFILE, s, *args)
 
+def _color(s, color):
+    if s.endswith("\n"):
+        return ''.join([color, "redo  ", vars.DEPTH, BOLD, s[:-1], PLAIN, s[-1]])
+    else:
+        return ''.join([color, "redo  ", vars.DEPTH, BOLD, s, PLAIN])
+
 def log(s, *args):
-    log_l(''.join([GREEN,  "redo  ", vars.DEPTH, BOLD, s, PLAIN]), *args)
+    log_l(_color(s, GREEN), *args)
 
 
 def err(s, *args):
-    log_l(''.join([RED,    "redo  ", vars.DEPTH, BOLD, s, PLAIN]), *args)
+    log_l(_color(s, RED), *args)
     log_cmd("redo_err", _fmt(s, *args))
 
 
 def warn(s, *args):
-    log_l(''.join([YELLOW, "redo  ", vars.DEPTH, BOLD, s, PLAIN]), *args)
+    log_l(_color(s, YELLOW), *args)
     log_cmd("redo_warn", _fmt(s, *args))
 
 
