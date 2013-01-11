@@ -158,12 +158,21 @@ def main(targets, toplevel=False):
     for t in targets:
         f = state.File(name=t)
         l = f.tmpfilename('log')
-        if not os.path.exists(l):
-            err('%s: no log\n', f.printable_name())
-        else:
-            log('%s\n', f.printable_name())
-            print_log(f, recursive=True)
-        if f.exitcode == 0:
-            log('%s (done)\n', f.printable_name())
-        elif toplevel and f.exitcode != None:
-            err('%s: exit code %d\n', f.printable_name(), f.exitcode)
+        try:
+            # Try to get lock to tell if the process is still running. If we
+            # don't get it, that's not important, the log file is append only
+            f.dolock.trylock(state.LOCK_SH)
+
+            if not os.path.exists(l):
+                err('%s: no log\n', f.printable_name())
+            else:
+                log('%s\n', f.printable_name())
+                print_log(f, recursive=True)
+            if not f.dolock.owned:
+                log('%s (still running)\n', f.printable_name())
+            elif f.exitcode == 0:
+                log('%s (done)\n', f.printable_name())
+            elif toplevel and f.exitcode != None:
+                err('%s: exit code %d\n', f.printable_name(), f.exitcode)
+        finally:
+            if f.dolock.owned: f.dolock.unlock()
