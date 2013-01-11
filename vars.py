@@ -3,12 +3,6 @@ from atoi import atoi
 import runid
 
 
-if not os.environ.get('REDO'):
-    import sys
-    sys.stderr.write('%s: error: must be run from inside a .do\n'
-                     % sys.argv[0])
-    sys.exit(100)
-
 # The absolute path that was os.getcwd() when we started.
 STARTDIR = os.environ.get('REDO_STARTDIR', '')
 
@@ -72,4 +66,39 @@ LOGFD = atoi(os.environ.get('REDO_LOGFD', ''), None)
 
 # The id of the current redo execution; an int(time.time()) value.
 RUNID_FILE = os.environ.get('REDO_RUNID_FILE')
-RUNID = runid.read(os.path.join(STARTDIR, RUNID_FILE))
+
+
+def init():
+    if not os.environ.get('REDO'):
+        import sys
+        sys.stderr.write('%s: error: must be run from inside a .do\n'
+                         % sys.argv[0])
+        sys.exit(100)
+    global RUNID
+    RUNID = runid.read(os.path.join(STARTDIR, RUNID_FILE))
+
+def cleanup():
+    if LOGFD:
+        os.close(LOGFD)
+
+    os.close(0)
+    os.close(1)
+    os.close(2)
+    STDIO = os.environ.get('REDO_STDIO')
+    if STDIO:
+        try:
+            a, b, c = [int(x) for x in STDIO.split(',')]
+            os.dup2(a, 0)
+            os.dup2(b, 1)
+            os.dup2(c, 2)
+        except: pass
+
+    for env in ['REDO', 'REDO_STARTDIR', 'REDO_PWD', 'REDO_TARGET',
+        'REDO_DEPTH', 'REDO_OVERWRITE', 'REDO_DEBUG', 'REDO_DEBUG_PIDS',
+        'REDO_DEBUG_LOCKS', 'REDO_OLD_ARGS', 'REDO_OLD_STDOUT',
+        'REDO_WARN_STDOUT', 'REDO_ONLY_LOG', 'REDO_VERBOSE', 'REDO_XTRACE',
+        'REDO_KEEP_GOING', 'REDO_SHUFFLE', 'REDO_LOGFD', 'REDO_RUNID_FILE',
+        'REDO_STDIO']:
+        try:    del os.environ[env]
+        except: pass
+

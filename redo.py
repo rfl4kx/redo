@@ -27,11 +27,12 @@ main=      Choose which redo flavour to execute
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 
 def read_opts():
+    redo_flavour = os.path.splitext(os.path.basename(sys.argv[0]))[0]
+    if redo_flavour == "redo-exec":
+        return False, 1, redo_flavour, sys.argv[1:]
+
     o = options.Options(optspec)
     (opt, flags, extra) = o.parse(sys.argv[1:])
-
-    redo_flavour = os.path.splitext(os.path.basename(sys.argv[0]))[0]
-    targets = extra
 
     if opt.overwrite:
         os.environ['REDO_OVERWRITE'] = '1'
@@ -66,7 +67,7 @@ def read_opts():
     if opt.main:
         redo_flavour = opt.main
 
-    return atoi(opt.jobs or 1), redo_flavour, targets
+    return True, atoi(opt.jobs or 1), redo_flavour, extra
 
 def set_main(arg0):
     # When the module is imported, change the process title.
@@ -131,26 +132,35 @@ def init(targets, redo_binaries=[]):
         os.environ['REDO_RUNID_FILE'] = '.redo/runid'
         runid.change('.redo/runid')
 
+    if not os.environ.get('REDO_STDIO'):
+        os.environ['REDO_STDIO'] = "%d,%d,%d" % (os.dup(0), os.dup(1), os.dup(2))
+
 try:
     from main import mains
-    jobs, redo_flavour, targets = read_opts()
-    init(targets, mains.keys())
-    from log import err, debug
-    import jwack
-
-    if not redo_flavour.startswith("redo"):
-        redo_flavour = "redo-%s" % redo_flavour
-    if redo_flavour not in mains:
-        err("invalid redo: %s\n", redo_flavour)
-        sys.exit(1)
-
-    set_main(redo_flavour)
+    do_init, jobs, redo_flavour, targets = read_opts()
     
-    if jobs < 1 or jobs > 1000:
-        err('invalid --jobs value: %r\n', opt.jobs)
-    jwack.setup(jobs)
+    if do_init:
+        init(targets, mains.keys())
+        from log import err, debug
+        import jwack
+
+        if not redo_flavour.startswith("redo"):
+            redo_flavour = "redo-%s" % redo_flavour
+        if redo_flavour not in mains:
+            err("invalid redo: %s\n", redo_flavour)
+            sys.exit(1)
+
+        set_main(redo_flavour)
+        
+        if jobs < 1 or jobs > 1000:
+            err('invalid --jobs value: %r\n', opt.jobs)
+        jwack.setup(jobs)
     
-    debug("%s %r\n", redo_flavour, targets)
+        debug("%s %r\n", redo_flavour, targets)
+
+        import vars
+        vars.init()
+
     sys.exit(mains[redo_flavour](redo_flavour, targets) or 0)
 except KeyboardInterrupt:
     sys.exit(200)

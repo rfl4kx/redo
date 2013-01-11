@@ -62,7 +62,6 @@ class Logger:
             os._exit(0)
         os.dup2(self.fd_std_out, 1)
         os.dup2(self.fd_err_out, 2)
-        os.dup2(self.fd_log_out, 3)
         os.close(self.fd_std_out)
         os.close(self.fd_err_out)
         os.close(self.fd_std_in)

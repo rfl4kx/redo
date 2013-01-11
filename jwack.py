@@ -71,12 +71,7 @@ def _try_read(fd, n):
     return b and b or None  # None means EOF
 
 
-def setup(maxjobs):
-    "Start the job server"
-    global _fds, _toplevel
-    if _fds:
-        return  # already set up
-    _debug('setup(%d)\n' % maxjobs)
+def _find_fds():
     flags = ' ' + os.getenv('MAKEFLAGS', '') + ' '
     FIND = ' --jobserver-fds='
     ofs = flags.find(FIND)
@@ -96,7 +91,27 @@ def setup(maxjobs):
                 raise ValueError('broken --jobserver-fds from make; prefix your Makefile rule with a "+"')
             else:
                 raise
-        _fds = (a,b)
+        return (a,b)
+    else:
+        return None
+
+
+def cleanup():
+    "Close file descriptors"
+    fds = _find_fds()
+    if fds:
+        a, b = fds
+        os.close(a)
+        os.close(b)
+
+
+def setup(maxjobs):
+    "Start the job server"
+    global _fds, _toplevel
+    if _fds:
+        return  # already set up
+    _debug('setup(%d)\n' % maxjobs)
+    _fds = _find_fds()
     if maxjobs and not _fds:
         # need to start a new server
         _toplevel = maxjobs

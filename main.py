@@ -10,6 +10,24 @@ def main_redo_log(redo_flavour, targets):
     targets = state.fix_chdir(targets)
     return logger.main(targets, toplevel=True)
 
+def main_redo_exec(redo_flavour, args):
+    import sys, os
+    import vars, jwack
+    from log import log
+
+    if len(args) == 0:
+        return 0
+
+    log("exec %s\n", " ".join(args))
+    vars.cleanup()
+    jwack.cleanup()
+
+    try:
+        os.execlp(args[0], *args)
+    except OSError, e:
+        sys.stderr.write("%s %s: %s\n" % (redo_flavour, e.filename, e.strerror))
+        return 1
+
 def main_redo_delegate(redo_flavour, targets):
     import builder, state, vars
     from log import debug2
@@ -147,4 +165,5 @@ mains = {
     'redo-ifchange': main_redo_ifchange,
     'redo-delegate': main_redo_delegate,
     'redo-log':      main_redo_log,
+    'redo-exec':     main_redo_exec,
     'redo':          main_redo}
