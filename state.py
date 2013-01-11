@@ -83,18 +83,24 @@ LOCK_EX = fcntl.LOCK_EX
 LOCK_SH = fcntl.LOCK_SH
 
 class Lock:
-    def __init__(self, name):
+    def __init__(self, name=None, f=None):
         self.owned = False
         self.name  = name
-        self.lockfile = os.open(self.name, os.O_RDWR | os.O_CREAT, 0666)
-        close_on_exec(self.lockfile, True)
+        if not f:
+            self.lockfile = os.open(self.name, os.O_RDWR | os.O_CREAT, 0666)
+            close_on_exec(self.lockfile, True)
+            self.close_on_del = True
+        else:
+            self.lockfile = f
+            self.close_on_del = False
         self.shared = fcntl.LOCK_SH
         self.exclusive = fcntl.LOCK_EX
 
     def __del__(self):
         if self.owned:
             self.unlock()
-        os.close(self.lockfile)
+        if self.close_on_del:
+            os.close(self.lockfile)
 
     def read(self):
         return LockHelper(self, fcntl.LOCK_SH)

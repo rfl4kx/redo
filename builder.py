@@ -1,8 +1,7 @@
 import sys, os, errno, stat
 import vars, state, jwack, deps, logger
 from helpers import unlink, close_on_exec, join
-from log import log, log_, debug, debug2, debug3, err, warn
-from logger import log_cmd
+from log import log, log_e, debug, debug2, debug3, err, warn, log_cmd
 
 
 def _default_do_files(filename):
@@ -146,11 +145,9 @@ class BuildJob:
         # name provided as $3
         self.tmpname_arg3 = os.path.join(self.outdir, self.target.basename())
         # name for the log file
-        self.tmpname_log = self.target.tmpfilename('log')
         unlink(self.tmpname_sout)
         unlink(self.tmpname_arg3)
-        unlink(self.tmpname_log)
-        self.log_fd = os.open(self.tmpname_log, os.O_CREAT|os.O_WRONLY|os.O_APPEND|os.O_EXCL, 0666)
+        self.tmpname_log, self.log_fd = logger.open_log(self.target, truncate=True)
         self.tmp_sout_fd = os.open(self.tmpname_sout, os.O_CREAT|os.O_RDWR|os.O_EXCL, 0666)
         close_on_exec(self.tmp_sout_fd, True)
         self.tmp_sout_f = os.fdopen(self.tmp_sout_fd, 'w+')
@@ -187,7 +184,7 @@ class BuildJob:
                 ]
         if vars.VERBOSE: argv[1] += 'v'
         if vars.XTRACE: argv[1] += 'x'
-        if vars.VERBOSE or vars.XTRACE: log_('\n')
+        if vars.VERBOSE or vars.XTRACE: log_e('\n')
 
         firstline = open(os.path.join(dodir, dofile)).readline().strip()
         if firstline.startswith('#!.../'):
@@ -202,7 +199,7 @@ class BuildJob:
         elif firstline.startswith('#!/'):
             argv[0:2] = firstline[2:].split(' ')
         log('%s\n', self.target.printable_name())
-        log_cmd("redo", self.target.name)
+        log_cmd("redo", self.target.name + "\n")
 
         try:
             dn = dodir
@@ -215,7 +212,7 @@ class BuildJob:
             l.fork()
             os.close(self.tmp_sout_fd)
             close_on_exec(1, False)
-            if vars.VERBOSE or vars.XTRACE: log_('* %s\n' % ' '.join(argv))
+            if vars.VERBOSE or vars.XTRACE: log_e('* %s\n' % ' '.join(argv))
             os.execvp(argv[0], argv)
         except:
             import traceback
@@ -228,6 +225,7 @@ class BuildJob:
 
     def done(self, t, rv):
         assert self.target.dolock.owned == state.LOCK_EX
+        log_cmd("redo_done", self.target.name + "\n")
         try:
             after_t = _try_stat(self.target.name)
             st1 = os.fstat(self.tmp_sout_f.fileno())
@@ -273,7 +271,7 @@ class BuildJob:
                 unlink(self.tmpname_arg3)
 
             if rv != 0:
-                if not vars.OUTPUT:
+                if vars.ONLY_LOG:
                     logger.print_log(self.target)
                 err('%s: exit code %d\n', self.target.printable_name(), rv)
             self.target.build_done(exitcode=rv)

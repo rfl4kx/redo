@@ -8,7 +8,7 @@ redo [targets...]
 --
 j,jobs=    maximum number of jobs to build at once
 d,debug    print dependency checks as they happen
-o,output   print generation output
+l,only-log print only tailed targets from log
 v,verbose  print commands as they are read from .do files (variables intact)
 x,xtrace   print commands as they are executed (variables expanded)
 k,keep-going  keep going as long as possible even if some targets fail
@@ -43,8 +43,8 @@ def read_opts():
         os.environ['REDO_DEBUG'] = str(opt.debug or 0)
     if opt.verbose:
         os.environ['REDO_VERBOSE'] = '1'
-    if opt.output:
-        os.environ['REDO_OUTPUT'] = '1'
+    if opt.only_log:
+        os.environ['REDO_ONLY_LOG'] = '1'
     if opt.xtrace:
         os.environ['REDO_XTRACE'] = '1'
     if opt.keep_going:

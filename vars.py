@@ -47,8 +47,8 @@ OLD_STDOUT = os.environ.get('REDO_OLD_STDOUT', '') and 1 or 0
 # The value of the --warn-stdout flag.
 WARN_STDOUT = os.environ.get('REDO_WARN_STDOUT', '') and 1 or 0
 
-# The value of the --output flag.
-OUTPUT = os.environ.get('REDO_OUTPUT', '') and 1 or 0
+# The value of the --only-log flag.
+ONLY_LOG = os.environ.get('REDO_ONLY_LOG', '') and 1 or 0
 
 # The value of the -v flag.
 VERBOSE = os.environ.get('REDO_VERBOSE', '') and 1 or 0
@@ -67,8 +67,8 @@ _color = sys.stderr.isatty() and (os.environ.get('TERM') or 'dumb') != 'dumb'
 COLOR = atoi(os.environ.get('REDO_COLOR', '1' if _color else '0'))
 if 'REDO_COLOR' not in os.environ: os.environ['REDO_COLOR'] = str(COLOR)
 
-# The REDO_LOGFD file descriptors
-LOGFD = [atoi(fd, None) for fd in os.environ.get('REDO_LOGFD', ',').split(',')]
+# The REDO_LOGFD file descriptor
+LOGFD = atoi(os.environ.get('REDO_LOGFD', ''), None)
 
 # The id of the current redo execution; an int(time.time()) value.
 RUNID_FILE = os.environ.get('REDO_RUNID_FILE')
