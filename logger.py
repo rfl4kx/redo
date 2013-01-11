@@ -38,7 +38,9 @@ class Logger:
             os.close(self.fd_log_out)
             os.close(self.fd_err_in)
             os.close(self.fd_log_in)
-            self._main(os.fdopen(self.fd_std_in), "std", sys.stdout, self.stdoutfd, dbg=self.fd_std_out)
+            sysout = sys.stdout
+            if vars.OLD_STDOUT: sysout = None
+            self._main(os.fdopen(self.fd_std_in), "std", sysout, self.stdoutfd)
             os._exit(0)
         pid2 = os.fork()
         if pid2 == 0:
@@ -48,7 +50,7 @@ class Logger:
             os.close(self.fd_std_in)
             os.close(self.fd_log_in)
             os.close(self.stdoutfd)
-            self._main(os.fdopen(self.fd_err_in), "err", sys.stderr, dbg=self.fd_err_out)
+            self._main(os.fdopen(self.fd_err_in), "err", sys.stderr)
             os._exit(0)
         pid3 = os.fork()
         if pid3 == 0:
@@ -58,7 +60,7 @@ class Logger:
             os.close(self.fd_std_in)
             os.close(self.fd_err_in)
             os.close(self.stdoutfd)
-            self._main(os.fdopen(self.fd_log_in), "log", LOGFILE, dbg=self.fd_log_out)
+            self._main(os.fdopen(self.fd_log_in), "log", LOGFILE)
             os._exit(0)
         os.dup2(self.fd_std_out, 1)
         os.dup2(self.fd_err_out, 2)
@@ -73,7 +75,7 @@ class Logger:
         os.environ["REDO_LOGFD"] = str(self.fd_log_out)
         os.close(self.logfd)
 
-    def _main(self, f, stamp, sysout=None, stdoutfd=None, dbg=""):
+    def _main(self, f, stamp, sysout=None, stdoutfd=None):
         lck = state.Lock(f=self.logfd)
         l = f.readline(1024)
         while len(l):

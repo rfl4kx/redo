@@ -1,1 +1,1 @@
-echo toto >&3
+echo toto
