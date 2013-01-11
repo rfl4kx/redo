@@ -360,81 +360,22 @@ parallel builds, it might not do anything useful.  We might
 change this behaviour someday since it's such a terrible
 idea for .do scripts to read from stdin.
 
-As with make, stderr is also not redirected.  You can use
-it to print status messages as your build proceeds. 
-(Eventually, we might want to capture stderr so it's easier
-to look at the results of parallel builds, but this is
-tricky to do in a user-friendly way.)
+However, stdout and stderr are logged, but apart from that,
+they can be used to log the build process.
 
-Redo treats stdout specially: it redirects it to point at
-$3 (see previous question).  That is, if your .do file
-writes to stdout, then the data it writes ends up in the
-output file.  Thus, a really simple `chicken.do` file that
-contains only this:
+Previous versions of redo used stdout to write the target file.
+This is not enabled any more. You can get warned about old
+scripts that write to stdout using `--warn-stdout` and you can
+enable the old behaviout using `--old-stdout`. However, you can
+easily port your scripts by putting before any instructions:
 
-    echo hello world
-
-will correctly, and atomically, generate an output file
-named `chicken` only if the echo command succeeds.
+    exec >"$3"
 
 
 # Isn't it confusing to have stdout go to the target by default?
 
-Yes, it is.  It's unlike what almost any other program
-does, especially make, and it's very easy to make a
-mistake.  For example, if you write in your script:
-
-	echo "Hello world"
-	
-it will go to the target file rather than to the screen.
-
-A more common mistake is to run a program that writes to
-stdout by accident as it runs.  When you do that, you'll
-produce your target on $3, but it might be intermingled
-with junk you wrote to stdout.  redo is pretty good about
-catching this mistake, and it'll print a message like this:
-
-	redo  zot.do wrote to stdout *and* created $3.
-	redo  ...you should write status messages to stderr, not stdout.
-	redo  zot: exit code 207
-
-Despite the disadvantages, though, automatically capturing
-stdout does make certain kinds of .do scripts really
-elegant.  The "simplest possible .do file" can be very
-short.  For example, here's one that produces a sub-list
-from a list:
-
-	redo-ifchange filelist
-	grep ^src/ filelist
-	
-redo's simplicity is an attempt to capture the "Zen of
-Unix," which has a lot to do with concepts like pipelines
-and stdout.  Why should every program have to implement its
-own -o (output filename) option when the shell already has
-a redirection operator?  Maybe if redo gets more popular,
-more programs in the world will be able to be even simpler
-than they are today.
-
-By the way, if you're running some programs that might
-misbehave and write garbage to stdout instead of stderr
-(Informational/status messages always belong on stderr, not
-stdout!  Fix your programs!), then just add this line to
-the top of your .do script:
-
-	exec >&2
-	
-That will redirect your stdout to stderr, so it works more
-like you expect.
-
-If you **really** want to use stdout, then you can use the `&3`
-file descriptor. To restore the stdout you can do:
-
-        exec >&3
-
-Or a more fancy version of this code that swaps `&1` and `&3`,
-allowing you to use `&3` instead of `$3` to generate the output:
-
-        exec 4>&1 >&3 3>&4 4>&-
+Yes, it is.  That is why the new redo doesn't have this feature
+enabled by default.
 
 
 # Can a *.do file itself be generated as part of the build process?
@@ -463,67 +404,8 @@ matters, you could just include it with your project.
 
 # How does redo store dependencies?
 
-At the toplevel of your project, redo creates a directory
-named `.redo`.  That directory contains a sqlite3 database
-with dependency information.
-
-The format of the `.redo` directory is undocumented because
-it may change at any time.  Maybe it will turn out that we
-can do something simpler than sqlite3.  If you really need to make a
-tool that pokes around in there, please ask on the mailing
-list if we can standardize something for you.
-
-
-# Isn't using sqlite3 overkill?  And un-djb-ish?
-
-Well, yes.  Sort of.  I think people underestimate how
-"lite" sqlite really is:
-
-	root root 573376 2010-10-20 09:55 /usr/lib/libsqlite3.so.0.8.6
-
-573k for a *complete* and *very fast* and *transactional*
-SQL database.  For comparison, libdb is:
-
-	root root 1256548 2008-09-13 03:23 /usr/lib/libdb-4.6.so
-
-...more than twice as big, and it doesn't even have an SQL parser in
-it!  Or if you want to be really horrified:
-
-	root root 1995612 2009-02-03 13:54 /usr/lib/libmysqlclient.so.15.0.0
-
-The mysql *client* library is two megs, and it doesn't even
-have a database server in it!  People who think SQL
-databases are automatically bloated and gross have not yet
-actually experienced the joys of sqlite.  SQL has a
-well-deserved bad reputation, but sqlite is another story
-entirely.  It's excellent, and much simpler and better
-written than you'd expect.
-
-But still, I'm pretty sure it's not very "djbish" to use a
-general-purpose database, especially one that has a *SQL
-parser* in it.  (One of the great things about redo's
-design is that it doesn't ever need to parse anything, so
-a SQL parser is a bit embarrassing.)
-
-I'm pretty sure djb never would have done it that way.
-However, I don't think we can reach the performance we want
-with dependency/build/lock information stored in plain text
-files; among other things, that results in too much
-fstat/open activity, which is slow in general, and even
-slower if you want to run on Windows.  That leads us to a
-binary database, and if the binary database isn't sqlite or
-libdb or something, that means we have to implement our own
-data structures.  Which is probably what djb would do, of
-course, but I'm just not convinced that I can do a better
-(or even a smaller) job of it than the sqlite guys did.
-
-Most of the state database stuff has been isolated in
-state.py.  If you're feeling brave, you can try to
-implement your own better state database, with or without
-sqlite.
-
-It is almost certainly possible to do it much more nicely
-than I have, so if you do, please send it in!
+In `.redo` directories.  There are many `.dep` files in there that
+contain the dependency information.  Look it up.
 
 
 # Is it better to run redo-ifchange once per dependency or just once?
@@ -1358,6 +1240,21 @@ Yes.  Put this in your .do script:
 	
 The child makes will then not have access to the jobserver,
 so will build serially instead.
+
+
+# Can I start long running services and not having redo wait for them?
+
+Yes.  Wrap the launch of your services with `redo-exec` that will
+close redo file descriptors and run your service.
+
+
+# Can I get the log of what happened during my last build?
+
+Yes.  Use `redo-log` just like you would use `redo`. Instead of
+rebuilding your targets, however, it will show the log.
+
+You can also look at the log format in the `.log` files inside
+the `.redo` directories.
 
 
 # How fast is redo compared to make?
