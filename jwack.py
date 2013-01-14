@@ -103,9 +103,9 @@ def cleanup():
         a, b = fds
         os.close(a)
         os.close(b)
-    waitfd = atoi(os.environ.get('REDO_JWACK', ''), None)
-    if waitfd != None:
-        os.close(waitfd)
+    for waitfd in os.environ.get('REDO_JWACK', '').split(','):
+        waitfd = atoi(waitfd, None)
+        if waitfd != None: os.close(waitfd)
     del os.environ['REDO_JWACK']
 
 
@@ -260,7 +260,7 @@ def start_job(reason, jobfunc, donefunc):
     if pid == 0:
         # child
         os.close(r)
-        os.environ['REDO_JWACK'] = str(w)
+        os.environ['REDO_JWACK'] = "%s,%d" % (os.environ.get('REDO_JWACK'), w)
         rv = 201
         try:
             try:
