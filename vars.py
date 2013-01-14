@@ -77,6 +77,10 @@ def init():
     global RUNID
     RUNID = runid.read(os.path.join(STARTDIR, RUNID_FILE))
 
+def reinit():
+    reload(sys.modules[__name__])
+    init()
+
 def cleanup():
     if LOGFD:
         os.close(LOGFD)

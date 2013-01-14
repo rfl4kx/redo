@@ -72,7 +72,11 @@ class Logger:
         close_on_exec(self.fd_log_out, False)
         close_on_exec(1, False)
         close_on_exec(2, False)
+
+        if vars.LOGFD: os.close(vars.LOGFD)
         os.environ["REDO_LOGFD"] = str(self.fd_log_out)
+        vars.reinit()
+
         os.close(self.logfd)
 
     def _main(self, f, stamp, sysout=None, stdoutfd=None):
