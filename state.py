@@ -165,6 +165,23 @@ class File(object):
         #return os.path.join(d, *r)
         return os.path.join(d, ".redo")
 
+    def check_deadlocks(self, check_with=None):
+        debug("%s: check deadlock with %r\n", self.printable_name(), check_with)
+        if not check_with:
+            parent = File(vars.TARGET)
+            return parent.check_deadlocks(check_with = self)
+        elif self == check_with:
+            return True
+        else:
+            try:
+                with open(self.tmpfilename('parent'), "r") as f:
+                    parent = f.read()
+                    parent = File(parent, self.dir)
+            except IOError:
+                return False
+            else:
+                return parent.check_deadlocks(check_with = check_with)
+
     def tmpfilename(self, filetype):
         return '%s.%s' % (os.path.join(self.redo_dir, self.basename()), filetype)
 
@@ -270,6 +287,9 @@ class File(object):
 
     def build_starting(self):
         """Call this when you're about to start building this target."""
+        if vars.TARGET:
+            with open(self.tmpfilename('parent'), "w") as f:
+                f.write(os.path.relpath(vars.TARGET, self.dir))
         depsname = self.tmpfilename('deps2')
         debug3('build starting: %r\n', depsname)
         unlink(depsname)
@@ -282,6 +302,7 @@ class File(object):
         self._add(exitcode)
         os.utime(depsname, (vars.RUNID, vars.RUNID))
         os.rename(depsname, self.tmpfilename('deps'))
+        unlink(self.tmpfilename('parent'))
 
     def add_dep(self, file):
         """Mark the given File() object as a dependency of this target.

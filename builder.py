@@ -330,26 +330,31 @@ class BuildJob:
 
 def build(f, any_errors, should_build, add_dep_to=None, delegate=None, re_do=True):
     if not f.read_only:
-        f.dolock.waitlock()
-        f.refresh()
-        dirty = should_build(f)
-        while dirty and dirty != deps.DIRTY:
-            # FIXME: bring back the old (targetname) notation in the output
-            #  when we need to do this.  And add comments.
-            for t2 in dirty:
-                build(t2, any_errors, should_build, delegate, re_do)
-                if any_errors[0] and not vars.KEEP_GOING:
-                    return
-            jwack.wait_all()
-            dirty = should_build(f)
-            #assert(dirty in (deps.DIRTY, deps.CLEAN))
-        if dirty:
-            job = BuildJob(f, any_errors, add_dep_to, delegate, re_do)
-            add_dep_to = None
-            job.schedule_job()
-            # jwack.wait_all() # temp: wait for the job to complete
+        if f.check_deadlocks():
+            err("%s: recursive dependency, breaking deadlock\n", f.printable_name())
+            any_errors[0] += 1
+            any_errors[1] += 1
         else:
-            f.dolock.unlock()
+            f.dolock.waitlock()
+            f.refresh()
+            dirty = should_build(f)
+            while dirty and dirty != deps.DIRTY:
+                # FIXME: bring back the old (targetname) notation in the output
+                #  when we need to do this.  And add comments.
+                for t2 in dirty:
+                    build(t2, any_errors, should_build, delegate, re_do)
+                    if any_errors[0] and not vars.KEEP_GOING:
+                        return
+                jwack.wait_all()
+                dirty = should_build(f)
+                #assert(dirty in (deps.DIRTY, deps.CLEAN))
+            if dirty:
+                job = BuildJob(f, any_errors, add_dep_to, delegate, re_do)
+                add_dep_to = None
+                job.schedule_job()
+                # jwack.wait_all() # temp: wait for the job to complete
+            else:
+                f.dolock.unlock()
     if add_dep_to:
         f.refresh()
         add_dep_to.add_dep(f)
