@@ -77,7 +77,9 @@ def set_main(arg0):
     except ImportError:
       	pass
     else:
-      	setproctitle(" ".join([arg0].extend(sys.argv[1:])))
+        args = sys.argv[1:]
+        args.insert(0, arg0)
+      	setproctitle(" ".join(args))
 
 
 def init(targets, redo_binaries=[]):
