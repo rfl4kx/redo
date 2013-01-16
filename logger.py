@@ -80,20 +80,23 @@ class Logger:
         os.close(self.logfd)
 
     def _main(self, f, stamp, sysout=None, stdoutfd=None):
-        lck = state.Lock(f=self.logfd)
-        l = f.readline(1024)
-        while len(l):
-            with lck.write():
-                os.write(self.logfd, _cmd_encode(stamp, l))
-                os.fsync(self.logfd)
-            if not vars.ONLY_LOG and sysout:
-                os.write(sysout.fileno(), l)
-                try: os.fsync(sysout.fileno())
-                except: pass
-            if stdoutfd:
-                os.write(stdoutfd, l)
-                os.fsync(stdoutfd)
+        try:
+            lck = state.Lock(f=self.logfd)
             l = f.readline(1024)
+            while len(l):
+                with lck.write():
+                    os.write(self.logfd, _cmd_encode(stamp, l))
+                    os.fsync(self.logfd)
+                if not vars.ONLY_LOG and sysout:
+                    os.write(sysout.fileno(), l)
+                    try: os.fsync(sysout.fileno())
+                    except: pass
+                if stdoutfd:
+                    os.write(stdoutfd, l)
+                    os.fsync(stdoutfd)
+                l = f.readline(1024)
+        except KeyboardInterrupt:
+            os._exit(200)
 
 class LogPrinter:
     def __init__(self, target, recursive):

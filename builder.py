@@ -98,7 +98,6 @@ class BuildJob:
 
     def prepare(self):
         assert self.target.dolock.owned == state.LOCK_EX
-        debug3('think about building %r\n', self.target.name)
         self.target.build_starting()
         self.before_t = _try_stat(self.target.name)
 
@@ -220,7 +219,7 @@ class BuildJob:
             err('internal exception - see above\n')
             raise
         finally:
-            # returns only if there's an exception
+            # returns only if there's an exception (exec in other case)
             os._exit(127)
 
     def done(self, t, rv):
@@ -335,29 +334,31 @@ def build(f, any_errors, should_build, add_dep_to=None, delegate=None, re_do=Tru
             any_errors[0] += 1
             any_errors[1] += 1
         else:
+            jwack.get_token(f)
             f.dolock.waitlock()
+            if any_errors[0] and not vars.KEEP_GOING:
+                return False
             f.refresh()
+            debug3('think about building %r\n', f.name)
             dirty = should_build(f)
             while dirty and dirty != deps.DIRTY:
                 # FIXME: bring back the old (targetname) notation in the output
                 #  when we need to do this.  And add comments.
                 for t2 in dirty:
-                    build(t2, any_errors, should_build, delegate, re_do)
-                    if any_errors[0] and not vars.KEEP_GOING:
-                        return
+                    if not build(t2, any_errors, should_build, delegate, re_do):
+                        return False
                 jwack.wait_all()
                 dirty = should_build(f)
-                #assert(dirty in (deps.DIRTY, deps.CLEAN))
             if dirty:
                 job = BuildJob(f, any_errors, add_dep_to, delegate, re_do)
                 add_dep_to = None
                 job.schedule_job()
-                # jwack.wait_all() # temp: wait for the job to complete
             else:
                 f.dolock.unlock()
     if add_dep_to:
         f.refresh()
         add_dep_to.add_dep(f)
+    return True
 
 def main(targets, should_build = (lambda f: deps.DIRTY), parent=None, delegate=None, re_do=True):
     any_errors = [0, 0]
@@ -371,8 +372,7 @@ def main(targets, should_build = (lambda f: deps.DIRTY), parent=None, delegate=N
     try:
         for t in targets:
             f = state.File(name=t)
-            build(f, any_errors, should_build, add_dep_to=parent, delegate=delegate, re_do=re_do)
-            if any_errors[0] and not vars.KEEP_GOING:
+            if not build(f, any_errors, should_build, add_dep_to=parent, delegate=delegate, re_do=re_do):
                 break
         jwack.wait_all()
     finally:
