@@ -96,6 +96,21 @@ def _find_fds():
         return None
 
 
+def cleanup_makeflags(flags):
+    i = flags.find("--jobserver-fds=")
+    if i >= 0:
+        prefix = flags[0:i] if i > 0 else ""
+        j = i
+        while j < len(flags):
+            if flags[j].isspace(): break
+            j += 1
+        if (flags[j+1:] + " ").startswith("-j "):
+            j += 2
+        return prefix + flags[j+1:]
+    else:
+        return flags
+
+
 def cleanup_on_exec():
     "Close file descriptors"
     fds = _find_fds()
@@ -107,6 +122,7 @@ def cleanup_on_exec():
         waitfd = atoi(waitfd, None)
         if waitfd != None: close_on_exec(waitfd, True)
     del os.environ['REDO_JWACK']
+    os.environ['MAKEFLAGS'] = cleanup_makeflags(os.getenv('MAKEFLAGS'))
 
 
 def setup(maxjobs):
@@ -121,9 +137,8 @@ def setup(maxjobs):
         _toplevel = maxjobs
         _fds = _make_pipe(100)
         _release(maxjobs-1)
-        os.putenv('MAKEFLAGS',
-                  '%s --jobserver-fds=%d,%d -j' % (os.getenv('MAKEFLAGS'),
-                                                    _fds[0], _fds[1]))
+        os.environ['MAKEFLAGS'] = '%s --jobserver-fds=%d,%d -j' % (
+            os.getenv('MAKEFLAGS'), _fds[0], _fds[1])
 
 
 def wait(want_token):
