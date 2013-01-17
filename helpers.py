@@ -26,4 +26,3 @@ def close_on_exec(fd, yes):
         fl |= fcntl.FD_CLOEXEC
     fcntl.fcntl(fd, fcntl.F_SETFD, fl)
 
-

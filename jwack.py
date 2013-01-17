@@ -96,16 +96,16 @@ def _find_fds():
         return None
 
 
-def cleanup():
+def cleanup_on_exec():
     "Close file descriptors"
     fds = _find_fds()
     if fds:
         a, b = fds
-        os.close(a)
-        os.close(b)
+        close_on_exec(a, True)
+        close_on_exec(b, True)
     for waitfd in os.environ.get('REDO_JWACK', '').split(','):
         waitfd = atoi(waitfd, None)
-        if waitfd != None: os.close(waitfd)
+        if waitfd != None: close_on_exec(waitfd, True)
     del os.environ['REDO_JWACK']
 
 

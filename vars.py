@@ -1,5 +1,6 @@
 import os, sys
 from atoi import atoi
+from helpers import close_on_exec
 import runid
 
 
@@ -81,13 +82,13 @@ def reinit():
     reload(sys.modules[__name__])
     init()
 
-def cleanup():
+def cleanup_on_exec():
     if LOGFD:
-        os.close(LOGFD)
+        close_on_exec(LOGFD, True)
 
-    os.close(0)
-    os.close(1)
-    os.close(2)
+    close_on_exec(0, True)
+    close_on_exec(1, True)
+    close_on_exec(2, True)
     STDIO = os.environ.get('REDO_STDIO')
     if STDIO:
         try:
@@ -95,6 +96,9 @@ def cleanup():
             os.dup2(a, 0)
             os.dup2(b, 1)
             os.dup2(c, 2)
+            close_on_exec(a, True)
+            close_on_exec(b, True)
+            close_on_exec(c, True)
         except: pass
 
     for env in ['REDO', 'REDO_STARTDIR', 'REDO_PWD', 'REDO_TARGET',

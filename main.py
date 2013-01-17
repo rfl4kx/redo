@@ -13,19 +13,19 @@ def main_redo_log(redo_flavour, targets):
 def main_redo_exec(redo_flavour, args):
     import sys, os
     import vars, jwack
-    from log import log
+    from log import log, err
 
     if len(args) == 0:
         return 0
 
     log("exec %s\n", " ".join(args))
-    vars.cleanup()
-    jwack.cleanup()
+    vars.cleanup_on_exec()
+    jwack.cleanup_on_exec()
 
     try:
         os.execlp(args[0], *args)
     except OSError, e:
-        sys.stderr.write("%s %s: %s\n" % (redo_flavour, e.filename, e.strerror))
+        err("exec %s: %s\n", e.filename or args[0], e.strerror)
         return 1
 
 def main_redo_delegate(redo_flavour, targets):
