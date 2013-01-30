@@ -81,6 +81,12 @@ class Logger:
 
     def _main(self, f, stamp, sysout=None, stdoutfd=None):
         try:
+            from setproctitle import setproctitle
+        except ImportError:
+            pass
+        else:
+            setproctitle("redo %s logger" % stamp)
+        try:
             lck = state.Lock(f=self.logfd)
             l = f.readline(1024)
             while len(l):
