@@ -86,21 +86,25 @@ class Lock:
     def __init__(self, name=None, f=None):
         self.owned = False
         self.name  = name
-        if not f:
-            self.lockfile = os.open(self.name, os.O_RDWR | os.O_CREAT, 0666)
-            close_on_exec(self.lockfile, True)
-            self.close_on_del = True
-        else:
-            self.lockfile = f
-            self.close_on_del = False
+        self.close_on_del = False
+        self.lockfile = f
         self.shared = fcntl.LOCK_SH
         self.exclusive = fcntl.LOCK_EX
+        self._open_lock()
 
     def __del__(self):
         if self.owned:
             self.unlock()
         if self.close_on_del:
             os.close(self.lockfile)
+
+    def _open_lock(self):
+        if not self.lockfile:
+            try: os.makedirs(os.path.dirname(self.name))
+            except: pass
+            self.lockfile = os.open(self.name, os.O_RDWR | os.O_CREAT, 0666)
+            self.close_on_del = True
+            close_on_exec(self.lockfile, True)
 
     def read(self):
         return LockHelper(self, fcntl.LOCK_SH)
@@ -111,6 +115,7 @@ class Lock:
     def trylock(self, kind=fcntl.LOCK_EX):
         assert(self.owned != kind)
         try:
+            self._open_lock()
             fcntl.lockf(self.lockfile, kind|fcntl.LOCK_NB, 0, 0)
         except IOError, e:
             if e.errno in (errno.EAGAIN, errno.EACCES):
@@ -125,12 +130,14 @@ class Lock:
     def waitlock(self, kind=fcntl.LOCK_EX):
         assert(self.owned != kind)
         if vars.DEBUG_LOCKS: debug("%s lock (wait)\n", self.name)
+        self._open_lock()
         fcntl.lockf(self.lockfile, kind, 0, 0)
         self.owned = kind
 
     def unlock(self):
         if not self.owned:
             raise Exception("can't unlock %r - we don't own it" % self.name)
+        self._open_lock()
         fcntl.lockf(self.lockfile, fcntl.LOCK_UN, 0, 0)
         if vars.DEBUG_LOCKS: debug("%s unlock\n", self.name)
         self.owned = False
@@ -145,11 +152,7 @@ class File(object):
         self.dir = os.path.split(self.name)[0]
         if name != ALWAYS:
             self.redo_dir = self._get_redodir(name)
-            try: os.makedirs(self.redo_dir)
-            except: pass
-            self.read_only = not os.path.isdir(self.redo_dir)
-            if not self.read_only:
-                self.dolock = Lock(self.tmpfilename("do.lock"))
+        self._dolock = None
         self.refresh()
 
     def __repr__(self):
@@ -165,8 +168,19 @@ class File(object):
         #return os.path.join(d, *r)
         return os.path.join(d, ".redo")
 
+    def dolock(self):
+        if self._dolock == None:
+            try:
+                self._dolock = Lock(self.tmpfilename("do.lock"))
+            except:
+                self._dolock = False
+        return self._dolock
+
     def check_deadlocks(self, check_with=None):
-        debug("%s: check deadlock with %r\n", self.printable_name(), check_with)
+        if check_with:
+            debug("%s: check deadlock with %r\n", self.printable_name(), check_with.printable_name())
+        else:
+            debug("%s: check deadlock\n", self.printable_name())
         if not check_with:
             parent = File(vars.TARGET)
             return parent.check_deadlocks(check_with = self)

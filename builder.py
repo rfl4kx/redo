@@ -97,7 +97,7 @@ class BuildJob:
         self.re_do    = re_do
 
     def prepare(self):
-        assert self.target.dolock.owned == state.LOCK_EX
+        assert self.target.dolock().owned == state.LOCK_EX
         self.target.build_starting()
         self.before_t = _try_stat(self.target.name)
 
@@ -223,7 +223,7 @@ class BuildJob:
             os._exit(127)
 
     def done(self, t, rv):
-        assert self.target.dolock.owned == state.LOCK_EX
+        assert self.target.dolock().owned == state.LOCK_EX
         log_cmd("redo_done", self.target.name + "\n")
         try:
             after_t = _try_stat(self.target.name)
@@ -285,7 +285,7 @@ class BuildJob:
 
         finally:
             self.tmp_sout_f.close()
-            self.target.dolock.unlock()
+            self.target.dolock().unlock()
 
     def _move_extra_results(self, src, dest, rv):
         assert src
@@ -304,8 +304,8 @@ class BuildJob:
                 os.rename(src, dest)
                 sf.copy_deps_from(self.target)
             else:
-                sf.dolock.trylock()
-                if sf.dolock.owned == state.LOCK_EX:
+                sf.dolock().trylock()
+                if sf.dolock().owned == state.LOCK_EX:
                     try:
                         sf.build_starting()
                         debug("rename %r %r\n", src, dest)
@@ -313,13 +313,13 @@ class BuildJob:
                         sf.copy_deps_from(self.target)
                         sf.build_done(rv)
                     finally:
-                        sf.dolock.unlock()
+                        sf.dolock().unlock()
                 else:
                     warn("%s: discarding (parallel build)\n", dest)
                     unlink(src)
 
     def schedule_job(self):
-        assert self.target.dolock.owned == state.LOCK_EX
+        assert self.target.dolock().owned == state.LOCK_EX
         rv = self.prepare()
         if rv != None:
             self.result[0] += rv
@@ -328,14 +328,14 @@ class BuildJob:
             jwack.start_job(self.target, self.build, self.done)
 
 def build(f, any_errors, should_build, add_dep_to=None, delegate=None, re_do=True):
-    if not f.read_only:
+    if f.dolock():
         if f.check_deadlocks():
             err("%s: recursive dependency, breaking deadlock\n", f.printable_name())
             any_errors[0] += 1
             any_errors[1] += 1
         else:
             jwack.get_token(f)
-            f.dolock.waitlock()
+            f.dolock().waitlock()
             if any_errors[0] and not vars.KEEP_GOING:
                 return False
             f.refresh()
@@ -354,7 +354,7 @@ def build(f, any_errors, should_build, add_dep_to=None, delegate=None, re_do=Tru
                 add_dep_to = None
                 job.schedule_job()
             else:
-                f.dolock.unlock()
+                f.dolock().unlock()
     if add_dep_to:
         f.refresh()
         add_dep_to.add_dep(f)
