@@ -103,7 +103,7 @@ class BuildJob:
 
         newstamp = self.target.read_stamp()
         if self.target.is_generated and newstamp != self.target.stamp:
-            if state.is_missing(newstamp):
+            if newstamp.is_missing():
                 # was marked generated, but is now deleted
                 debug3('oldstamp=%r newstamp=%r\n', self.target.stamp, newstamp)
                 self.target.forget()
@@ -130,7 +130,7 @@ class BuildJob:
 
         (self.dodir, self.dofile, self.dobasedir, self.dobasename, self.doext) = _find_do_file(self.target)
         if not self.dofile:
-            if state.is_missing(newstamp):
+            if newstamp.is_missing():
                 err('no rule to make %r\n', self.target.name)
                 return 1
             else:

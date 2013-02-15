@@ -4,9 +4,9 @@ from log import debug, debug2, err
 
 def should_build(f):
     if f.stamp_mtime == 0:
-        expect_stamp = None
+        expect_stamp = state.Stamp()
     else:
-        expect_stamp = f.csum or f.stamp
+        expect_stamp = f.stamp
     dirty = deps.isdirty(f, depth='', expect_stamp=expect_stamp,
                          max_runid=vars.RUNID)
     return dirty==[f] and deps.DIRTY or dirty
