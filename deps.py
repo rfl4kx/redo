@@ -11,7 +11,10 @@ def isdirty(f, depth, expect_stamp, max_runid):
     assert(isinstance(expect_stamp, state.Stamp))
     debug('%s?%s\n', depth, f.name)
 
-    if not f.is_generated and not expect_stamp and f.exists():
+    debug3('%sexpect: %r\n', depth, expect_stamp)
+    debug3('%sold:    %r\n', depth, f.stamp)
+
+    if not f.is_generated and expect_stamp.is_none() and f.exists():
         debug('%s-- CLEAN (static)\n', depth)
         return CLEAN
     if f.exitcode:
@@ -29,12 +32,9 @@ def isdirty(f, depth, expect_stamp, max_runid):
 
     newstamp = f.read_stamp()
 
-    debug3('%sexpect: %s\n', depth, expect_stamp)
-    debug3('%sold:    %s\n', depth, f.stamp)
-    debug3('%snew:    %s\n', depth, newstamp)
-    if f.stamp.csum: debug3('%scsum:   %s\n', depth, f.stamp.csum)
+    debug3('%snew:    %r\n', depth, newstamp)
 
-    if f.is_generated and newstamp.ne(f.stamp) and not newstamp.is_missing():
+    if newstamp.is_override_or_missing(f) and not newstamp.is_missing():
         if vars.OVERWRITE:
             debug('%s-- DIRTY (override)\n', depth)
             return DIRTY
@@ -42,7 +42,7 @@ def isdirty(f, depth, expect_stamp, max_runid):
             debug('%s-- CLEAN (override)\n', depth)
             return CLEAN
 
-    if newstamp.ne(f.stamp):
+    if newstamp.stamp != f.stamp.stamp:
         if newstamp.is_missing():
             debug('%s-- DIRTY (missing)\n', depth)
         else:
@@ -97,7 +97,7 @@ def isdirty(f, depth, expect_stamp, max_runid):
         # redo-ifchange f and it won't have any uncertainty next time.
         return must_build
 
-    if expect_stamp.ne(f.stamp):
+    if expect_stamp.is_dirty(f):
         # This must be after we checked the children. Before, we didn't knew
         # if the current target was dirty or not
         debug('%s-- DIRTY (parent)\n', depth)

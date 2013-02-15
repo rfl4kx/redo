@@ -173,10 +173,11 @@ class File(object):
         return self._dolock
 
     def check_deadlocks(self, check_with=None):
-        if check_with:
-            debug("%s: check deadlock with %r\n", self.printable_name(), check_with.printable_name())
-        else:
-            debug("%s: check deadlock\n", self.printable_name())
+        #if check_with:
+        #    debug("%s: check deadlock with %r\n",
+        #          self.printable_name(), check_with.printable_name())
+        #else:
+        #    debug("%s: check deadlock\n", self.printable_name())
         if not check_with:
             parent = File(vars.TARGET)
             return parent.check_deadlocks(check_with = self)
@@ -271,7 +272,7 @@ class File(object):
                 # a line added by redo-stamp
                 self.stamp.csum = self.deps.pop(-1)[0]
             for i in range(len(self.deps)):
-                self.deps[i][0] = Stamp(self.deps[i][0])
+                self.deps[i][0] = Stamp(auto_detect=self.deps[i][0])
 
     def exists(self):
         return os.path.exists(self.name)
@@ -371,23 +372,22 @@ class File(object):
 class Stamp:
     "either a checksum or a stamp"
 
-    def __init__(self, stamp = None, csum = None):
+    def __init__(self, stamp = None, csum = None, auto_detect=None):
         assert(stamp == None or isinstance(stamp, str))
         assert(csum == None or isinstance(csum, str))
         self.stamp = stamp
         self.csum  = csum
+        if auto_detect:
+            if '-' in auto_detect or '+' in auto_detect or auto_detect in [STAMP_DIR, STAMP_MISSING]:
+                self.stamp = auto_detect
+            else:
+                self.csum  = auto_detect
 
     def __eq__(self, other):
         assert(False)
 
     def __ne__(self, other):
         assert(False)
-
-    def eq(self, other):
-        return self.stamp == other.stamp and self.csum == other.csum
-
-    def ne(self, other):
-        return self.stamp != other.stamp or self.csum != other.csum
 
     def is_missing(self):
         if not self.stamp:
@@ -412,6 +412,18 @@ class Stamp:
     def __str__(self):
         assert(False)
 
+    def __repr__(self):
+        return "%r %r" % (self.stamp, self.csum)
+
     def csum_or_stamp(self):
         return self.csum or self.stamp
 
+    def is_override_or_missing(self, f):
+        """check the file is overriden by the user or if it is missing, given
+        that self is a newly computed stamp (no checksum) and other is the File
+        object"""
+        return f.is_generated and f.stamp.stamp != self.stamp
+
+    def is_dirty(self, f):
+        "is the information in the self stamp dirty compared to file f"
+        return self.csum and self.csum != f.stamp.csum or self.stamp and self.stamp != f.stamp.stamp
