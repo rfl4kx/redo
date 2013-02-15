@@ -146,7 +146,7 @@ class BuildJob:
         # name for the log file
         unlink(self.tmpname_sout)
         unlink(self.tmpname_arg3)
-        self.tmpname_log, self.log_fd = logger.open_log(self.target, truncate=True)
+        self.log_fd = logger.open_log(self.target, truncate=True)
         self.tmp_sout_fd = os.open(self.tmpname_sout, os.O_CREAT|os.O_RDWR|os.O_EXCL, 0666)
         close_on_exec(self.tmp_sout_fd, True)
         self.tmp_sout_f = os.fdopen(self.tmp_sout_fd, 'w+')

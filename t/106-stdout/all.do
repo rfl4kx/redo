@@ -9,9 +9,7 @@ export REDO_OLD_STDOUT=1
 unset REDO_OLD_STDOUT
 export REDO_WARN_STDOUT=1
 if val="$(redo stdout)"; then
-  exit 31
-elif [ "$val" != "toto" ]; then
-  exit 32
+  exit 31 # Should fail if --warn-stdout
 fi
 
 export REDO_OLD_STDOUT=1

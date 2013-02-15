@@ -65,6 +65,9 @@ if 'REDO_COLOR' not in os.environ: os.environ['REDO_COLOR'] = str(COLOR)
 # The REDO_LOGFD file descriptor
 LOGFD = atoi(os.environ.get('REDO_LOGFD', ''), None)
 
+# The REDO_LOGFD file descriptor
+LOG = atoi(os.environ.get('REDO_LOG', '0'), 0)
+
 # The id of the current redo execution; an int(time.time()) value.
 RUNID_FILE = os.environ.get('REDO_RUNID_FILE')
 
