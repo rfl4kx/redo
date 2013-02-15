@@ -33,7 +33,10 @@ class Logger:
             self.fd_log_in, self.fd_log_out = os.pipe()
 
     def fork(self):
-        if not vars.LOG: return
+        if not vars.LOG:
+            if vars.OLD_STDOUT or vars.WARN_STDOUT:
+                os.dup2(self.stdoutfd, 1)
+            return
         pid = os.fork()
         if pid == 0:
             os.close(self.fd_std_out)
