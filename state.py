@@ -51,11 +51,6 @@ def files():
         for i in _files(depfile[:-10], seen):
             yield i
 
-def _extract_runid(stamp):
-    _, _, runid = stamp.rpartition('+')
-    try: return int(runid)
-    except: return None
-
 # FIXME: I really want to use fcntl F_SETLK, F_SETLKW, etc here.  But python
 # doesn't do the lockdata structure in a portable way, so we have to use
 # fcntl.lockf() instead.  Usually this is just a wrapper for fcntl, so it's
@@ -154,18 +149,13 @@ class File(object):
             self.redo_dir = self._get_redodir(name)
         self._dolock = None
         self.refresh()
+        assert(isinstance(self.stamp, Stamp))
 
     def __repr__(self):
         return 'state.File(%s)' % self.name
 
     def _get_redodir(self, name):
         d = os.path.dirname(name)
-        #r = [".redo"]
-        #while not os.path.isdir(d):
-        #    d, sep, base = d.rpartition.split('/')
-        #    if not sep: break
-        #    r.append("%s.redo" % base)
-        #return os.path.join(d, *r)
         return os.path.join(d, ".redo")
 
     def dolock(self):
@@ -177,10 +167,11 @@ class File(object):
         return self._dolock
 
     def check_deadlocks(self, check_with=None):
-        if check_with:
-            debug("%s: check deadlock with %r\n", self.printable_name(), check_with.printable_name())
-        else:
-            debug("%s: check deadlock\n", self.printable_name())
+        #if check_with:
+        #    debug("%s: check deadlock with %r\n",
+        #          self.printable_name(), check_with.printable_name())
+        #else:
+        #    debug("%s: check deadlock\n", self.printable_name())
         if not check_with:
             parent = File(vars.TARGET)
             return parent.check_deadlocks(check_with = self)
@@ -233,8 +224,7 @@ class File(object):
             self.exitcode = 0
             self.deps = []
             self.is_generated = True
-            self.csum = None
-            self.stamp = str(vars.RUNID)
+            self.stamp = Stamp(str(vars.RUNID))
             return
         assert(not self.name.startswith('/'))
         try:
@@ -249,9 +239,8 @@ class File(object):
                 self.stamp_mtime = 0  # no stamp file
                 self.exitcode = 0
                 self.deps = []
-                self.stamp = STAMP_MISSING
+                self.stamp = Stamp(STAMP_MISSING)
                 self.runid = None
-                self.csum = None
                 self.is_generated = True
             else:
                 # it's a source file (without a .deps file)
@@ -259,9 +248,8 @@ class File(object):
                 self.exitcode = 0
                 self.deps = []
                 self.is_generated = False
-                self.csum = None
                 self.stamp = self.read_stamp(st=st)
-                self.runid = _extract_runid(self.stamp)
+                self.runid = self.stamp.runid()
         else:
             # it's a target (with a .deps file)
             st = os.fstat(f.fileno())
@@ -269,15 +257,16 @@ class File(object):
             self.stamp_mtime = int(st.st_mtime)
             self.exitcode = int(lines.pop(-1))
             self.is_generated = True
-            self.csum = None
-            self.stamp = lines.pop(-1)
-            self.runid = _extract_runid(self.stamp)
+            self.stamp = Stamp(lines.pop(-1))
+            self.runid = self.stamp.runid()
             self.deps = [line.split(' ', 1) for line in lines]
             # if the next line fails, it means that the .dep file is not
             # correctly formatted
             while self.deps and self.deps[-1][1] == '.':
                 # a line added by redo-stamp
-                self.csum = self.deps.pop(-1)[0]
+                self.stamp.csum = self.deps.pop(-1)[0]
+            for i in range(len(self.deps)):
+                self.deps[i][0] = Stamp(auto_detect=self.deps[i][0])
 
     def exists(self):
         return os.path.exists(self.name)
@@ -312,7 +301,7 @@ class File(object):
         """Call this when you're done building this target."""
         depsname = self.tmpfilename('deps2')
         debug3('build ending: %r\n', depsname)
-        self._add(self.read_stamp(runid=vars.RUNID))
+        self._add(self.read_stamp(runid=vars.RUNID).stamp)
         self._add(exitcode)
         os.utime(depsname, (vars.RUNID, vars.RUNID))
         os.rename(depsname, self.tmpfilename('deps'))
@@ -331,50 +320,105 @@ class File(object):
             relname = os.path.relpath(file.name, self.dir)
         debug3('add-dep: %r < %r %r\n', self.name, file.stamp, relname)
         assert('\n' not in file.name)
-        assert(' '  not in file.stamp)
-        assert('\n' not in file.stamp)
-        assert('\t' not in file.stamp)
-        assert('\r' not in file.stamp)
-        self._add('%s %s' % (file.csum or file.stamp, relname))
+        assert(isinstance(file.stamp, Stamp))
+        self._add('%s %s' % (file.stamp.csum_or_stamp(), relname))
 
     def copy_deps_from(self, other):
         for dep in other.deps:
-            self._add('%s %s' % (dep[0], dep[1]))
+            self._add('%s %s' % (dep[0].stamp, dep[1]))
 
     def read_stamp(self, runid=None, st=None, st_deps=None):
         # FIXME: make this formula more well-defined
-        if runid is None:
-            if st_deps == None:
-                try: st_deps = os.stat(self.tmpfilename('deps'))
-                except OSError: st_deps = False
-
-            if st_deps == False:
-                runid_suffix = ''
-            else:
-                runid_suffix = '+' + str(int(st_deps.st_mtime))
-        else:
-            runid_suffix = '+' + str(int(runid))
-
+        if runid == None and st_deps == None:
+            try: st_deps = os.stat(self.tmpfilename('deps'))
+            except OSError: st_deps = False
         if st == None:
             try: st = os.stat(self.name)
             except OSError: st = False
 
-        if st == False:
-            return STAMP_MISSING + runid_suffix
-        if stat.S_ISDIR(st.st_mode):
-            return STAMP_DIR + runid_suffix
-        else:
-            # a "unique identifier" stamp for a regular file
-            return join('-', (st.st_ctime, st.st_mtime,
-                              st.st_size, st.st_ino)) + runid_suffix
+        if runid == None and st_deps:
+            runid = int(st_deps.st_mtime)
+
+        return Stamp(st = st, runid = runid)
 
     def __eq__(self, other):
         try:
             return os.path.realpath(self.name) == os.path.realpath(other.name)
         except:
             return False
+    
+    def __ne__(self, other):
+        return not self.__eq__(other)
 
-def is_missing(stamp):
-    if not stamp:
-        return False
-    return stamp == STAMP_MISSING or stamp.startswith(STAMP_MISSING + '+')
+class Stamp:
+    "either a checksum or a stamp"
+
+    def __init__(self, stamp=None, csum=None, auto_detect=None, st=None, runid=None):
+        assert(stamp == None or isinstance(stamp, str))
+        assert(csum == None or isinstance(csum, str))
+        self.stamp = stamp
+        self.csum  = csum
+        if auto_detect:
+            if len(auto_detect) == 40 and auto_detect.isalnum():
+                self.csum  = auto_detect
+            else:
+                self.stamp = auto_detect
+        elif st != None:
+            if st == False:
+                self.stamp = STAMP_MISSING
+            elif stat.S_ISDIR(st.st_mode):
+                self.stamp = STAMP_DIR
+            else:
+                self.stamp = join('-', (st.st_ctime, st.st_mtime,
+                                        st.st_size, st.st_dev, st.st_ino))
+            if runid:
+                self.stamp = self.stamp + '+' + str(int(runid))
+
+    def __eq__(self, other):
+        assert(False)
+
+    def __ne__(self, other):
+        assert(False)
+
+    def is_missing(self):
+        if not self.stamp:
+            return False
+        return self.stamp == STAMP_MISSING or self.stamp.startswith(STAMP_MISSING + '+')
+
+    def is_stamp(self):
+        return self.stamp != None
+
+    def is_csum(self):
+        return self.csum != None
+
+    def is_none(self):
+        return self.stamp == None and self.csum == None
+
+    def runid(self):
+        try:
+            _, _, runid = self.stamp.rpartition('+')
+            return int(runid)
+        except: return None
+
+    def __str__(self):
+        assert(False)
+
+    def __repr__(self):
+        return "%r %r" % (self.stamp, self.csum)
+
+    def csum_or_stamp(self):
+        return self.csum or self.stamp
+
+    def is_override_or_missing(self, f):
+        """check the file is overriden by the user or if it is missing, given
+        that self is a newly computed stamp (no checksum) and other is the File
+        object"""
+        return f.is_generated and f.stamp.stamp != self.stamp
+
+    def is_stamp_dirty(self, f):
+        "is the information in the self stamp (not csum) dirty compared to file f"
+        return self.stamp != f.stamp.stamp
+
+    def is_dirty(self, f):
+        "is the information in the self stamp or csum dirty compared to file f"
+        return self.csum and self.csum != f.stamp.csum or self.stamp and self.is_stamp_dirty(f)

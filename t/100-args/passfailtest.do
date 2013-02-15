@@ -5,7 +5,7 @@ redo passfail
 [ -e passfail ] || exit 42
 PF1=$(cat passfail)
 touch pleasefail
-redo passfail 2>/dev/null && exit 43
+redo passfail && exit 43
 [ -e passfail ] || exit 44
 PF2=$(cat passfail)
 [ "$PF1" = "$PF2" ] || exit 45

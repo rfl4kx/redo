@@ -8,32 +8,33 @@ DIRTY = 1
 # FIXME: sanitize the return values of this function into a tuple instead.
 # FIXME: max_runid is probably the wrong concept.
 def isdirty(f, depth, expect_stamp, max_runid):
+    assert(isinstance(expect_stamp, state.Stamp))
     debug('%s?%s\n', depth, f.name)
 
-    if not f.is_generated and not expect_stamp and f.exists():
+    debug3('%sexpect: %r\n', depth, expect_stamp)
+    debug3('%sold:    %r\n', depth, f.stamp)
+
+    if not f.is_generated and expect_stamp.is_none() and f.exists():
         debug('%s-- CLEAN (static)\n', depth)
         return CLEAN
     if f.exitcode:
         debug('%s-- DIRTY (failed last time)\n', depth)
         return DIRTY
-    if not state.is_missing(expect_stamp) and state.is_missing(f.stamp):
+    if not expect_stamp.is_missing() and f.stamp.is_missing():
         debug('%s-- DIRTY (never built)\n', depth)
         return DIRTY
     if f.stamp_mtime > max_runid:
         debug('%s-- DIRTY (built)\n', depth)
         return DIRTY
-    if not f.stamp:
+    if not f.stamp or f.stamp.is_none():
         debug('%s-- DIRTY (no stamp)\n', depth)
         return DIRTY
 
     newstamp = f.read_stamp()
 
-    debug3('%sexpect: %s\n', depth, expect_stamp)
-    debug3('%sold:    %s\n', depth, f.stamp)
-    debug3('%snew:    %s\n', depth, newstamp)
-    if f.csum: debug3('%scsum:   %s\n', depth, f.csum)
+    debug3('%snew:    %r\n', depth, newstamp)
 
-    if f.is_generated and newstamp != f.stamp and not state.is_missing(newstamp):
+    if newstamp.is_override_or_missing(f) and not newstamp.is_missing():
         if vars.OVERWRITE:
             debug('%s-- DIRTY (override)\n', depth)
             return DIRTY
@@ -41,12 +42,12 @@ def isdirty(f, depth, expect_stamp, max_runid):
             debug('%s-- CLEAN (override)\n', depth)
             return CLEAN
 
-    if newstamp != f.stamp:
-        if state.is_missing(newstamp):
+    if newstamp.is_stamp_dirty(f):
+        if newstamp.is_missing():
             debug('%s-- DIRTY (missing)\n', depth)
         else:
             debug('%s-- DIRTY (mtime)\n', depth)
-        return [f] if f.csum else DIRTY
+        return [f] if f.stamp.is_csum() else DIRTY
 
     must_build = []
     for stamp2, f2 in f.deps:
@@ -68,7 +69,7 @@ def isdirty(f, depth, expect_stamp, max_runid):
                 debug('%s-- DIRTY (sub)\n', depth)
                 dirty = sub
 
-        if not f.csum:
+        if not f.stamp.is_csum():
             # f is a "normal" target: dirty f2 means f is instantly dirty
             if dirty:
                 # if dirty==DIRTY, this means f is definitely dirty.
@@ -96,7 +97,7 @@ def isdirty(f, depth, expect_stamp, max_runid):
         # redo-ifchange f and it won't have any uncertainty next time.
         return must_build
 
-    if expect_stamp != (f.csum or f.stamp):
+    if expect_stamp.is_dirty(f):
         # This must be after we checked the children. Before, we didn't knew
         # if the current target was dirty or not
         debug('%s-- DIRTY (parent)\n', depth)
