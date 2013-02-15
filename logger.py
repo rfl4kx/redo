@@ -5,6 +5,7 @@ from log import log, err, warn, LOGFILE, _cmd_encode
 
 
 def open_log(t=None, truncate=False):
+    if not vars.LOG: return None
     if not t:
         t = state.File(vars.TARGET)
     f = t.tmpfilename('log')
@@ -13,12 +14,12 @@ def open_log(t=None, truncate=False):
         unlink(f)
         flags = flags|os.O_CREAT
     fd = os.open(f, flags, 0666)
-    return f, fd
+    return fd
 
 try:
-    _, LOGCMD = open_log()
-    LOCKCMD   = state.Lock(f=LOGCMD)
-except OSError, e:
+    LOGCMD  = open_log()
+    LOCKCMD = state.Lock(f=LOGCMD)
+except:
     LOGCMD  = None
     LOCKCMD = None
 
@@ -26,11 +27,13 @@ class Logger:
     def __init__(self, logfd, stdoutfd):
         self.stdoutfd = stdoutfd
         self.logfd    = logfd
-        self.fd_std_in, self.fd_std_out = os.pipe()
-        self.fd_err_in, self.fd_err_out = os.pipe()
-        self.fd_log_in, self.fd_log_out = os.pipe()
+        if vars.LOG:
+            self.fd_std_in, self.fd_std_out = os.pipe()
+            self.fd_err_in, self.fd_err_out = os.pipe()
+            self.fd_log_in, self.fd_log_out = os.pipe()
 
     def fork(self):
+        if not vars.LOG: return
         pid = os.fork()
         if pid == 0:
             os.close(self.fd_std_out)
