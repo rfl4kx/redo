@@ -102,7 +102,7 @@ class BuildJob:
         self.before_t = _try_stat(self.target.name)
 
         newstamp = self.target.read_stamp()
-        if self.target.is_generated and newstamp != self.target.stamp:
+        if self.target.is_generated and newstamp.ne(self.target.stamp):
             if newstamp.is_missing():
                 # was marked generated, but is now deleted
                 debug3('oldstamp=%r newstamp=%r\n', self.target.stamp, newstamp)

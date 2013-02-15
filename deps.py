@@ -34,7 +34,7 @@ def isdirty(f, depth, expect_stamp, max_runid):
     debug3('%snew:    %s\n', depth, newstamp)
     if f.stamp.csum: debug3('%scsum:   %s\n', depth, f.stamp.csum)
 
-    if f.is_generated and newstamp != f.stamp and not newstamp.is_missing():
+    if f.is_generated and newstamp.ne(f.stamp) and not newstamp.is_missing():
         if vars.OVERWRITE:
             debug('%s-- DIRTY (override)\n', depth)
             return DIRTY
@@ -42,7 +42,7 @@ def isdirty(f, depth, expect_stamp, max_runid):
             debug('%s-- CLEAN (override)\n', depth)
             return CLEAN
 
-    if newstamp != f.stamp:
+    if newstamp.ne(f.stamp):
         if newstamp.is_missing():
             debug('%s-- DIRTY (missing)\n', depth)
         else:
@@ -97,7 +97,7 @@ def isdirty(f, depth, expect_stamp, max_runid):
         # redo-ifchange f and it won't have any uncertainty next time.
         return must_build
 
-    if expect_stamp != f.stamp:
+    if expect_stamp.ne(f.stamp):
         # This must be after we checked the children. Before, we didn't knew
         # if the current target was dirty or not
         debug('%s-- DIRTY (parent)\n', depth)

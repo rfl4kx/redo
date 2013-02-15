@@ -330,7 +330,7 @@ class File(object):
 
     def copy_deps_from(self, other):
         for dep in other.deps:
-            self._add('%s %s' % (dep[0], dep[1]))
+            self._add('%s %s' % (dep[0].stamp, dep[1]))
 
     def read_stamp(self, runid=None, st=None, st_deps=None):
         # FIXME: make this formula more well-defined
@@ -364,6 +364,9 @@ class File(object):
             return os.path.realpath(self.name) == os.path.realpath(other.name)
         except:
             return False
+    
+    def __ne__(self, other):
+        return not self.__eq__(other)
 
 class Stamp:
     "either a checksum or a stamp"
@@ -377,8 +380,14 @@ class Stamp:
     def __eq__(self, other):
         assert(False)
 
+    def __ne__(self, other):
+        assert(False)
+
     def eq(self, other):
         return self.stamp == other.stamp and self.csum == other.csum
+
+    def ne(self, other):
+        return self.stamp != other.stamp or self.csum != other.csum
 
     def is_missing(self):
         if not self.stamp:
