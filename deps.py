@@ -26,7 +26,7 @@ def isdirty(f, depth, expect_stamp, max_runid):
     if f.stamp_mtime > max_runid:
         debug('%s-- DIRTY (built)\n', depth)
         return DIRTY
-    if not f.stamp:
+    if not f.stamp or f.stamp.is_none():
         debug('%s-- DIRTY (no stamp)\n', depth)
         return DIRTY
 
@@ -42,12 +42,12 @@ def isdirty(f, depth, expect_stamp, max_runid):
             debug('%s-- CLEAN (override)\n', depth)
             return CLEAN
 
-    if newstamp.stamp != f.stamp.stamp:
+    if newstamp.is_stamp_dirty(f):
         if newstamp.is_missing():
             debug('%s-- DIRTY (missing)\n', depth)
         else:
             debug('%s-- DIRTY (mtime)\n', depth)
-        return [f] if f.stamp.csum else DIRTY
+        return [f] if f.stamp.is_csum() else DIRTY
 
     must_build = []
     for stamp2, f2 in f.deps:
@@ -69,7 +69,7 @@ def isdirty(f, depth, expect_stamp, max_runid):
                 debug('%s-- DIRTY (sub)\n', depth)
                 dirty = sub
 
-        if not f.stamp.csum:
+        if not f.stamp.is_csum():
             # f is a "normal" target: dirty f2 means f is instantly dirty
             if dirty:
                 # if dirty==DIRTY, this means f is definitely dirty.

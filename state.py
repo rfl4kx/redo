@@ -156,12 +156,6 @@ class File(object):
 
     def _get_redodir(self, name):
         d = os.path.dirname(name)
-        #r = [".redo"]
-        #while not os.path.isdir(d):
-        #    d, sep, base = d.rpartition.split('/')
-        #    if not sep: break
-        #    r.append("%s.redo" % base)
-        #return os.path.join(d, *r)
         return os.path.join(d, ".redo")
 
     def dolock(self):
@@ -424,6 +418,10 @@ class Stamp:
         object"""
         return f.is_generated and f.stamp.stamp != self.stamp
 
+    def is_stamp_dirty(self, f):
+        "is the information in the self stamp (not csum) dirty compared to file f"
+        return self.stamp != f.stamp.stamp
+
     def is_dirty(self, f):
-        "is the information in the self stamp dirty compared to file f"
+        "is the information in the self stamp or csum dirty compared to file f"
         return self.csum and self.csum != f.stamp.csum or self.stamp and self.stamp != f.stamp.stamp
