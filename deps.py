@@ -23,6 +23,9 @@ def isdirty(f, depth, expect_stamp, max_runid):
     if not expect_stamp.is_missing() and f.stamp.is_missing():
         debug('%s-- DIRTY (never built)\n', depth)
         return DIRTY
+    if f.stamp.is_old():
+        debug('%s-- DIRTY (from old redo)\n', depth)
+        return DIRTY
     if f.stamp_mtime > max_runid:
         debug('%s-- DIRTY (built)\n', depth)
         return DIRTY
