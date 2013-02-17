@@ -441,16 +441,6 @@ class Stamp:
         object"""
         return f.is_generated and f.stamp.stamp != self.stamp and not f.stamp.is_old()
 
-    def _decompose_stamp(self):
-        if self.stamp == None:
-            return None
-        elif self.stamp in [STAMP_DIR, STAMP_MISSING, STAMP_OLD]:
-            return self.stamp
-        stamp, _, runid = self.stamp.partition('+')
-        stamp = stamp.split('-')
-        stamp.append(runid)
-        return stamp
-
     def is_stamp_dirty(self, f):
         "is the information in the self stamp (not csum) dirty compared to file f"
         return self.stamp != f.stamp.stamp
