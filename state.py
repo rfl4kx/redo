@@ -5,8 +5,10 @@ from log import warn, err, debug, debug2, debug3
 
 ALWAYS = '//ALWAYS'   # an invalid filename that is always marked as dirty
 STAMP_DIR = 'dir'     # the stamp of a directory; mtime is unhelpful
+STAMP_OLD = 'old'     # the .deps file is from and old redo
 STAMP_MISSING = '0'   # the stamp of a nonexistent file
 
+DEPSFILE_TAG = "redo.0"
 
 def fix_chdir(targets):
     """Undo any chdir() done by the .do script that called us.
@@ -254,19 +256,36 @@ class File(object):
             # it's a target (with a .deps file)
             st = os.fstat(f.fileno())
             lines = f.read().strip().split('\n')
-            self.stamp_mtime = int(st.st_mtime)
-            self.exitcode = int(lines.pop(-1))
-            self.is_generated = True
-            self.stamp = Stamp(lines.pop(-1))
-            self.runid = self.stamp.runid()
-            self.deps = [line.split(' ', 1) for line in lines]
-            # if the next line fails, it means that the .dep file is not
-            # correctly formatted
-            while self.deps and self.deps[-1][1] == '.':
-                # a line added by redo-stamp
-                self.stamp.csum = self.deps.pop(-1)[0]
-            for i in range(len(self.deps)):
-                self.deps[i][0] = Stamp(auto_detect=self.deps[i][0])
+            version = None
+            device  = None
+            inode   = None
+            try:
+                version = lines.pop(0)
+                device, inode = [int(i) for i in lines.pop(0).split(" ")]
+            except: pass
+            if version != DEPSFILE_TAG or device != st.st_dev or inode != st.st_ino:
+                # It is an old .deps file, consider it missing
+                self.stamp_mtime = 0  # no stamp file
+                self.exitcode = 0
+                self.deps = []
+                self.stamp = Stamp(STAMP_OLD)
+                self.runid = None
+                self.is_generated = True
+            else:
+                # Read .deps file
+                self.stamp_mtime = int(st.st_mtime)
+                self.exitcode = int(lines.pop(-1))
+                self.is_generated = True
+                self.stamp = Stamp(lines.pop(-1))
+                self.runid = self.stamp.runid()
+                self.deps = [line.split(' ', 1) for line in lines]
+                # if the next line fails, it means that the .dep file is not
+                # correctly formatted
+                while self.deps and self.deps[-1][1] == '.':
+                    # a line added by redo-stamp
+                    self.stamp.csum = self.deps.pop(-1)[0]
+                for i in range(len(self.deps)):
+                    self.deps[i][0] = Stamp(auto_detect=self.deps[i][0])
 
     def exists(self):
         return os.path.exists(self.name)
@@ -284,9 +303,9 @@ class File(object):
         debug3('_add(%s) to %r\n', line, depsname)
         #assert os.path.exists(depsname)
         line = str(line)
-        f = open(depsname, 'a')
         assert('\n' not in line)
-        f.write(line + '\n')
+        with open(depsname, 'a') as f:
+            f.write(line + '\n')
 
     def build_starting(self):
         """Call this when you're about to start building this target."""
@@ -296,6 +315,10 @@ class File(object):
         depsname = self.tmpfilename('deps2')
         debug3('build starting: %r\n', depsname)
         unlink(depsname)
+        with open(depsname, 'a') as f:
+            f.write(DEPSFILE_TAG + '\n')
+            st = os.fstat(f.fileno())
+            f.write('%d %d\n' % (st.st_dev, st.st_ino))
 
     def build_done(self, exitcode):
         """Call this when you're done building this target."""
@@ -385,6 +408,9 @@ class Stamp:
             return False
         return self.stamp == STAMP_MISSING or self.stamp.startswith(STAMP_MISSING + '+')
 
+    def is_old(self):
+        return self.stamp == STAMP_OLD
+
     def is_stamp(self):
         return self.stamp != None
 
@@ -413,7 +439,7 @@ class Stamp:
         """check the file is overriden by the user or if it is missing, given
         that self is a newly computed stamp (no checksum) and other is the File
         object"""
-        return f.is_generated and f.stamp.stamp != self.stamp
+        return f.is_generated and f.stamp.stamp != self.stamp and not f.stamp.is_old()
 
     def is_stamp_dirty(self, f):
         "is the information in the self stamp (not csum) dirty compared to file f"
