@@ -7,7 +7,6 @@ def should_build(f):
         expect_stamp = state.Stamp()
     else:
         expect_stamp = f.stamp
-    dirty = deps.isdirty(f, depth='', expect_stamp=expect_stamp,
-                         max_runid=vars.RUNID)
+    dirty = deps.isdirty(f, depth='', expect_stamp=expect_stamp)
     return dirty==[f] and deps.DIRTY or dirty
 

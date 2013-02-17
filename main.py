@@ -125,8 +125,7 @@ def main_redo_ood(redo_flavour, targets):
 
     for f in state.files():
         if f.is_generated and f.exists():
-            if deps.isdirty(f, depth='', max_runid=vars.RUNID,
-                            expect_stamp=f.stamp):
+            if deps.isdirty(f, depth='', expect_stamp=f.stamp):
                 print f.name
 
 def main_redo_sources(redo_flavour, targets):

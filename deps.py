@@ -6,8 +6,7 @@ CLEAN = 0
 DIRTY = 1
 
 # FIXME: sanitize the return values of this function into a tuple instead.
-# FIXME: max_runid is probably the wrong concept.
-def isdirty(f, depth, expect_stamp, max_runid):
+def isdirty(f, depth, expect_stamp):
     assert(isinstance(expect_stamp, state.Stamp))
     debug('%s?%s\n', depth, f.name)
 
@@ -25,9 +24,6 @@ def isdirty(f, depth, expect_stamp, max_runid):
         return DIRTY
     if f.stamp.is_old():
         debug('%s-- DIRTY (from old redo)\n', depth)
-        return DIRTY
-    if f.stamp_mtime > max_runid:
-        debug('%s-- DIRTY (built)\n', depth)
         return DIRTY
     if not f.stamp or f.stamp.is_none():
         debug('%s-- DIRTY (no stamp)\n', depth)
@@ -66,8 +62,7 @@ def isdirty(f, depth, expect_stamp, max_runid):
         else:
             f2 = state.File(f2, f.dir)
             sub = isdirty(f2, depth = depth + '  ',
-                          expect_stamp = stamp2,
-                          max_runid = max(f.stamp_mtime, vars.RUNID))
+                          expect_stamp = stamp2)
             if sub:
                 debug('%s-- DIRTY (sub)\n', depth)
                 dirty = sub
