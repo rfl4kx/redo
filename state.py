@@ -329,30 +329,17 @@ class File(object):
 
     def read_stamp(self, runid=None, st=None, st_deps=None):
         # FIXME: make this formula more well-defined
-        if runid is None:
-            if st_deps == None:
-                try: st_deps = os.stat(self.tmpfilename('deps'))
-                except OSError: st_deps = False
-
-            if st_deps == False:
-                runid_suffix = ''
-            else:
-                runid_suffix = '+' + str(int(st_deps.st_mtime))
-        else:
-            runid_suffix = '+' + str(int(runid))
-
+        if runid == None and st_deps == None:
+            try: st_deps = os.stat(self.tmpfilename('deps'))
+            except OSError: st_deps = False
         if st == None:
             try: st = os.stat(self.name)
             except OSError: st = False
 
-        if st == False:
-            return Stamp(STAMP_MISSING + runid_suffix)
-        if stat.S_ISDIR(st.st_mode):
-            return Stamp(STAMP_DIR + runid_suffix)
-        else:
-            # a "unique identifier" stamp for a regular file
-            return Stamp(join('-', (st.st_ctime, st.st_mtime,
-                                    st.st_size, st.st_dev, st.st_ino)) + runid_suffix)
+        if runid == None and st_deps:
+            runid = int(st_deps.st_mtime)
+
+        return Stamp(st = st, runid = runid)
 
     def __eq__(self, other):
         try:
@@ -366,16 +353,26 @@ class File(object):
 class Stamp:
     "either a checksum or a stamp"
 
-    def __init__(self, stamp = None, csum = None, auto_detect=None):
+    def __init__(self, stamp=None, csum=None, auto_detect=None, st=None, runid=None):
         assert(stamp == None or isinstance(stamp, str))
         assert(csum == None or isinstance(csum, str))
         self.stamp = stamp
         self.csum  = csum
         if auto_detect:
-            if '-' in auto_detect or '+' in auto_detect or auto_detect in [STAMP_DIR, STAMP_MISSING]:
-                self.stamp = auto_detect
-            else:
+            if len(auto_detect) == 40 and auto_detect.isalnum():
                 self.csum  = auto_detect
+            else:
+                self.stamp = auto_detect
+        elif st != None:
+            if st == False:
+                self.stamp = STAMP_MISSING
+            elif stat.S_ISDIR(st.st_mode):
+                self.stamp = STAMP_DIR
+            else:
+                self.stamp = join('-', (st.st_ctime, st.st_mtime,
+                                        st.st_size, st.st_dev, st.st_ino))
+            if runid:
+                self.stamp = self.stamp + '+' + str(int(runid))
 
     def __eq__(self, other):
         assert(False)
@@ -418,10 +415,20 @@ class Stamp:
         object"""
         return f.is_generated and f.stamp.stamp != self.stamp
 
+    def _decompose_stamp(self):
+        if self.stamp == None:
+            return None
+        elif self.stamp in [STAMP_DIR, STAMP_MISSING, STAMP_OLD]:
+            return self.stamp
+        stamp, _, runid = self.stamp.partition('+')
+        stamp = stamp.split('-')
+        stamp.append(runid)
+        return stamp
+
     def is_stamp_dirty(self, f):
         "is the information in the self stamp (not csum) dirty compared to file f"
         return self.stamp != f.stamp.stamp
 
     def is_dirty(self, f):
         "is the information in the self stamp or csum dirty compared to file f"
-        return self.csum and self.csum != f.stamp.csum or self.stamp and self.stamp != f.stamp.stamp
+        return self.csum and self.csum != f.stamp.csum or self.stamp and self.is_stamp_dirty(f)
