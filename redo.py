@@ -8,19 +8,19 @@ redo [targets...]
 --
 j,jobs=    maximum number of jobs to build at once
 d,debug    print dependency checks as they happen
-l,only-log print only tailed targets from log
 v,verbose  print commands as they are read from .do files (variables intact)
 x,xtrace   print commands as they are executed (variables expanded)
 k,keep-going  keep going as long as possible even if some targets fail
-log        activate log recording
 overwrite  overwrite files even if generated outside of redo
+log        activate log recording (slower)
+only-log   print only failed targets from log
 shuffle    randomize the build order to find dependency bugs
 debug-locks  print messages about file locking (useful for debugging)
 debug-pids   print process ids as part of log messages (useful for debugging)
 version    print the current version and exit
 color      force enable color (--no-color to disable)
 old-args   use old-style definitions of $1,$2,$3 (deprecated)
-old-stdout use old-style stdout to create target
+old-stdout use old-style stdout to create target (deprecated)
 warn-stdout warn if stdout is used
 main=      Choose which redo flavour to execute
 """
@@ -45,8 +45,6 @@ def read_opts():
         os.environ['REDO_DEBUG'] = str(opt.debug or 0)
     if opt.verbose:
         os.environ['REDO_VERBOSE'] = '1'
-    if opt.only_log:
-        os.environ['REDO_ONLY_LOG'] = '1'
     if opt.xtrace:
         os.environ['REDO_XTRACE'] = '1'
     if opt.keep_going:
@@ -67,6 +65,8 @@ def read_opts():
         os.environ['REDO_COLOR'] = str(opt.color)
     if opt.log != None:
         os.environ['REDO_LOG'] = str(opt.log)
+    if opt.only_log:
+        os.environ['REDO_ONLY_LOG'] = '1'
     if opt.main:
         redo_flavour = opt.main
 
