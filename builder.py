@@ -16,7 +16,6 @@ def _default_do_files(filename):
 def _possible_do_files(t):
     dirname,filename = os.path.split(t)
     yield (dirname, "%s.do" % filename, '', filename, '')
-    yield (dirname, "%s.do" % filename, '', filename, '')
 
     # It's important to try every possibility in a directory before resorting
     # to a parent directory.  Think about nested projects: I don't want
