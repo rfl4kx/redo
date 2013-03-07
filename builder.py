@@ -25,8 +25,7 @@ def _possible_do_files(t):
     # for building my project in *all* cases.
     dirbits = os.path.abspath(dirname).split('/')
     for i in range(len(dirbits), -1, -1):
-        basedir = os.path.join(dirname,
-                               join('/', ['..'] * (len(dirbits) - i)))
+        basedir = os.path.join(dirname, *['..'] * (len(dirbits) - i))
         subdir = join('/', dirbits[i:])
         for dofile,basename,ext in _default_do_files(filename):
             yield (basedir, dofile,
