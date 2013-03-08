@@ -26,10 +26,10 @@ def fix_chdir(targets):
     Returns:
       targets, but relative to the (newly changed) os.getcwd().
     """
-    abs_pwd = os.path.join(vars.STARTDIR, vars.PWD)
+    abs_pwd = os.path.join(vars.STARTDIR, vars.PWD).rstrip('/do')
     if os.path.samefile('.', abs_pwd):
         return targets  # nothing to change
-    rel_orig_dir = os.path.relpath('.', abs_pwd)
+    rel_orig_dir = os.path.relpath('.', abs_pwd).rstrip('/do')
     os.chdir(abs_pwd)
     return [os.path.join(rel_orig_dir, t) for t in targets]
 
@@ -209,7 +209,7 @@ class File(object):
         will be relative to the user's starting directory, regardless of
         which .do file we're in or the getcwd() of the moment.
         """
-        base = os.path.join(vars.PWD, self.name)
+        base = os.path.join(vars.PWD.rstrip('/do'), self.name)
         base_full_dir = os.path.dirname(os.path.join(vars.STARTDIR, base))
         norm = os.path.normpath(base)
         norm_full_dir = os.path.dirname(os.path.join(vars.STARTDIR, norm))
